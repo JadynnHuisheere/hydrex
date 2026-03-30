@@ -9,17 +9,16 @@ import {
   useState,
   type ReactNode
 } from "react";
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  type User
-} from "firebase/auth";
+import type { User } from "firebase/auth";
 
 import { appConfig, isFirebaseConfigured } from "@/lib/config";
-import { getFirebaseAuth } from "@/lib/firebase/auth";
+import {
+  onAuthUserChanged,
+  setAuthDisplayName,
+  signInWithEmailAuth,
+  signOutAuthUser,
+  signUpWithEmailAuth
+} from "@/lib/firebase/auth";
 import {
   ensureUserProfile,
   fetchUserProfile,
@@ -75,14 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const auth = getFirebaseAuth();
+    let unsubscribe: (() => void) | null = null;
 
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-
-    return onAuthStateChanged(auth, async (nextUser) => {
+    void onAuthUserChanged(async (nextUser) => {
       setUser(nextUser);
 
       if (!nextUser) {
@@ -94,35 +88,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nextProfile = await loadProfile(nextUser);
       setProfile(nextProfile);
       setLoading(false);
+    }).then((unsub) => {
+      unsubscribe = unsub;
+      if (!unsubscribe) {
+        setLoading(false);
+      }
     });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
-    const auth = getFirebaseAuth();
-
-    if (!auth) {
-      throw new Error("firebase-not-configured");
-    }
-
-    const credential = await signInWithEmailAndPassword(auth, email, password);
+    const credential = await signInWithEmailAuth(email, password);
     const nextProfile = await loadProfile(credential.user);
     setProfile(nextProfile);
   }, []);
 
   const signUpWithEmail = useCallback(
     async (name: string, email: string, password: string) => {
-      const auth = getFirebaseAuth();
-
-      if (!auth) {
-        throw new Error("firebase-not-configured");
-      }
-
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      const credential = await signUpWithEmailAuth(email, password);
 
       if (name.trim().length > 0) {
-        await updateProfile(credential.user, {
-          displayName: name.trim()
-        });
+        await setAuthDisplayName(credential.user, name.trim());
       }
 
       const nextProfile = await ensureUserProfile(
@@ -136,13 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOutUser = useCallback(async () => {
-    const auth = getFirebaseAuth();
-
-    if (!auth) {
-      return;
-    }
-
-    await signOut(auth);
+    await signOutAuthUser();
     setProfile(null);
     setUser(null);
   }, []);

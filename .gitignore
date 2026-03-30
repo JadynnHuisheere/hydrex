@@ -3,6 +3,7 @@
 node_modules
 .tsbuildinfo
 *.tsbuildinfo
+.wrangler
 .env*
 !.env.example
 cloudflare-env.d.ts
