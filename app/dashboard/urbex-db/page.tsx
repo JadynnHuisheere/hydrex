@@ -61,7 +61,7 @@ export default function UrbexDbPage() {
 
   const leaderboardTop = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
 
-  if (loading || !user || !profile || !licensed) {
+  if (loading || !user || !licensed) {
     return (
       <main className="app-shell flex items-center justify-center text-sm text-[var(--text-muted)]">
         Loading Urbex DB...

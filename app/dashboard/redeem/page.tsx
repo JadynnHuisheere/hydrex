@@ -32,7 +32,7 @@ export default function RedeemPage() {
     }
   }, [loading, profile?.role, router, user]);
 
-  if (loading || !user || !profile) {
+  if (loading || !user) {
     return (
       <main className="app-shell flex items-center justify-center text-sm text-[var(--text-muted)]">
         Loading redemption flow...
