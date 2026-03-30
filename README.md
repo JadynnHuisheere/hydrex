@@ -39,3 +39,15 @@ Demo license keys:
 
 - `npm run preview` to test the OpenNext Cloudflare adapter locally.
 - `npm run deploy` to build and deploy with Wrangler.
+
+### Cloudflare dashboard command settings
+
+If you are using Cloudflare Workers Builds, configure commands as:
+
+- Build command: `npm run cf:build`
+- Deploy command: `npm run cf:deploy`
+
+Do not use `npm run build` followed by `npx wrangler deploy` for this project.
+`next build` alone does not generate the OpenNext compiled config needed by the
+OpenNext deploy step, which causes:
+`ERROR Could not find compiled Open Next config, did you run the build command?`
