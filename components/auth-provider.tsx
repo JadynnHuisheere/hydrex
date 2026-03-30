@@ -85,9 +85,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const nextProfile = await loadProfile(nextUser);
-      setProfile(nextProfile);
-      setLoading(false);
+      try {
+        const nextProfile = await loadProfile(nextUser);
+        setProfile(nextProfile);
+      } catch {
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
     }).then((unsub) => {
       unsubscribe = unsub;
       if (!unsubscribe) {
@@ -104,8 +109,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     const credential = await signInWithEmailAuth(email, password);
-    const nextProfile = await loadProfile(credential.user);
-    setProfile(nextProfile);
+    try {
+      const nextProfile = await loadProfile(credential.user);
+      setProfile(nextProfile);
+    } catch {
+      setProfile(null);
+    }
   }, []);
 
   const signUpWithEmail = useCallback(
@@ -116,12 +125,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await setAuthDisplayName(credential.user, name.trim());
       }
 
-      const nextProfile = await ensureUserProfile(
-        credential.user.uid,
-        credential.user.email ?? email,
-        name.trim()
-      );
-      setProfile(nextProfile);
+      try {
+        const nextProfile = await ensureUserProfile(
+          credential.user.uid,
+          credential.user.email ?? email,
+          name.trim()
+        );
+        setProfile(nextProfile);
+      } catch {
+        setProfile(null);
+      }
     },
     []
   );

@@ -56,7 +56,7 @@ export default function DashboardPage() {
 
   const licensed = profile?.role === "licensed" || profile?.role === "admin";
 
-  if (loading || !user || !profile) {
+  if (loading || !user) {
     return (
       <main className="app-shell flex items-center justify-center text-sm text-[var(--text-muted)]">
         Loading dashboard...
@@ -81,9 +81,9 @@ export default function DashboardPage() {
 
             <div className="panel rounded-[28px] px-5 py-4 text-sm text-[var(--text-muted)]">
               <p className="eyebrow">Current session</p>
-              <p className="mt-2 text-lg font-semibold text-[var(--text)]">{profile.name}</p>
-              <p>{profile.email}</p>
-              <p className="mt-1 uppercase tracking-[0.18em]">Role: {profile.role}</p>
+              <p className="mt-2 text-lg font-semibold text-[var(--text)]">{profile?.name ?? user.displayName ?? user.email}</p>
+              <p>{profile?.email ?? user.email}</p>
+              <p className="mt-1 uppercase tracking-[0.18em]">Role: {profile?.role ?? "base"}</p>
             </div>
           </div>
 
@@ -146,7 +146,7 @@ export default function DashboardPage() {
               <p className="eyebrow">Implementation status</p>
               <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--text-muted)]">
                 <p>Auth provider: {firebaseReady ? "Firebase" : "not configured"}</p>
-                <p>License redeemed: {profile.licenseRedeemed ? "yes" : "no"}</p>
+                <p>License redeemed: {profile?.licenseRedeemed ? "yes" : "no"}</p>
                 <p>Cloudflare adapter: configured through OpenNext and Wrangler.</p>
               </div>
             </section>
