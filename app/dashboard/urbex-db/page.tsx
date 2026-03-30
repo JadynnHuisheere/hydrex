@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -12,6 +12,7 @@ import {
   fetchPendingSubmissions,
   hasAppAccess,
   reviewSubmission,
+  submitLocationSubmission,
   type LocationRecord,
   type SubmissionRecord,
   type UserProfile
@@ -39,6 +40,11 @@ export default function UrbexDbPage() {
   const [leaderboard, setLeaderboard] = useState<RankedUser[]>([]);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [moderationMessage, setModerationMessage] = useState<string | null>(null);
+  const [submissionPending, setSubmissionPending] = useState(false);
+  const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedState, setSelectedState] = useState("all");
+  const submissionFormRef = useRef<HTMLFormElement | null>(null);
 
   const hasUrbexAccess = hasAppAccess(profile, "urbex-db");
   const canModerate = profile?.role === "admin" || profile?.role === "mod" || hasAppAccess(profile, "moderation");
@@ -92,7 +98,77 @@ export default function UrbexDbPage() {
     setReviewingId(null);
   }
 
+  async function onSubmitLocation(formData: FormData) {
+    if (!user) {
+      return;
+    }
+
+    setSubmissionPending(true);
+    setSubmissionMessage(null);
+
+    const result = await submitLocationSubmission({
+      uid: user.uid,
+      submittedBy: profile?.name ?? user.displayName ?? user.email ?? "Explorer",
+      title: String(formData.get("title") ?? ""),
+      region: String(formData.get("region") ?? ""),
+      state: String(formData.get("state") ?? ""),
+      address: String(formData.get("address") ?? ""),
+      lat: Number(formData.get("lat") ?? 0),
+      lng: Number(formData.get("lng") ?? 0),
+      description: String(formData.get("description") ?? ""),
+      note: String(formData.get("note") ?? ""),
+      images: Number(formData.get("images") ?? 0)
+    });
+
+    if (!result.ok) {
+      setSubmissionMessage(
+        result.reason === "invalid-coordinates"
+          ? "Enter valid latitude and longitude values."
+          : "Fill out the location details before submitting."
+      );
+      setSubmissionPending(false);
+      return;
+    }
+
+    submissionFormRef.current?.reset();
+    setSubmissionMessage("Submission sent to the moderation queue.");
+    await refreshPanels();
+    setSubmissionPending(false);
+  }
+
   const leaderboardTop = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
+  const availableStates = useMemo(
+    () => Array.from(new Set(approvedLocations.map((location) => location.state))).sort(),
+    [approvedLocations]
+  );
+  const filteredLocations = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return approvedLocations.filter((location) => {
+      const matchesState = selectedState === "all" || location.state === selectedState;
+
+      if (!matchesState) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      const searchable = [
+        location.title,
+        location.region,
+        location.state,
+        location.address,
+        location.description,
+        location.submittedBy
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+  }, [approvedLocations, searchTerm, selectedState]);
 
   if (loading || !user || !hasUrbexAccess) {
     return (
@@ -126,35 +202,167 @@ export default function UrbexDbPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-5">
                 <div>
                   <p className="eyebrow">Map system</p>
-                  <p className="mt-2 text-xl font-semibold">Approved pins only in the first release</p>
+                  <p className="mt-2 text-xl font-semibold">Search approved pins by state, address, or region</p>
                 </div>
-                <p className="text-sm text-[var(--text-muted)]">{approvedLocations.length} approved locations</p>
+                <p className="text-sm text-[var(--text-muted)]">{filteredLocations.length} of {approvedLocations.length} approved locations</p>
               </div>
-              <UrbexMap locations={approvedLocations} />
+              <div className="grid gap-4 pb-5 md:grid-cols-[1.3fr_0.7fr]">
+                <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                  <span>Search by title, address, state, region</span>
+                  <input
+                    value={searchTerm}
+                    onChange={(event) => {
+                      setSearchTerm(event.target.value);
+                    }}
+                    placeholder="Search locations in an area"
+                    className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                  />
+                </label>
+                <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                  <span>State</span>
+                  <select
+                    value={selectedState}
+                    onChange={(event) => {
+                      setSelectedState(event.target.value);
+                    }}
+                    className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                  >
+                    <option value="all">All states</option>
+                    {availableStates.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <UrbexMap locations={filteredLocations} />
             </article>
 
             <article className="panel rounded-[32px] p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="eyebrow">Submission readiness</p>
-                  <p className="mt-2 text-xl font-semibold">Backend path planned next</p>
+                  <p className="eyebrow">Submit a location</p>
+                  <p className="mt-2 text-xl font-semibold">Send new spots into the moderation queue</p>
                 </div>
                 <span className="rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                  Prototype status
+                  Urbex access enabled
                 </span>
               </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
-                <div className="rounded-[24px] bg-white/80 p-4 text-sm leading-7 text-[var(--text-muted)]">
-                  Coordinates, description, and optional image uploads will be the first submission payload.
+              <form
+                ref={submissionFormRef}
+                action={(formData) => {
+                  void onSubmitLocation(formData);
+                }}
+                className="mt-5 space-y-4"
+              >
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Location title</span>
+                    <input
+                      name="title"
+                      required
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Region</span>
+                    <input
+                      name="region"
+                      required
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
                 </div>
-                <div className="rounded-[24px] bg-white/80 p-4 text-sm leading-7 text-[var(--text-muted)]">
-                  Images are intended to upload directly to R2 with signed URLs.
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>State</span>
+                    <input
+                      name="state"
+                      required
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Address</span>
+                    <input
+                      name="address"
+                      required
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
                 </div>
-                <div className="rounded-[24px] bg-white/80 p-4 text-sm leading-7 text-[var(--text-muted)]">
-                  Only moderator-approved records will join the public map dataset.
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Latitude</span>
+                    <input
+                      name="lat"
+                      type="number"
+                      step="any"
+                      required
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Longitude</span>
+                    <input
+                      name="lng"
+                      type="number"
+                      step="any"
+                      required
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
                 </div>
-              </div>
+
+                <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                  <span>Description</span>
+                  <textarea
+                    name="description"
+                    required
+                    rows={4}
+                    className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                  />
+                </label>
+
+                <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Moderator note</span>
+                    <input
+                      name="note"
+                      placeholder="Access details, safety note, or context"
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Image count</span>
+                    <input
+                      name="images"
+                      type="number"
+                      min={0}
+                      defaultValue={0}
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                </div>
+
+                {submissionMessage ? (
+                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    {submissionMessage}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={submissionPending}
+                  className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {submissionPending ? "Submitting..." : "Submit to moderation"}
+                </button>
+              </form>
             </article>
           </div>
 
@@ -188,7 +396,7 @@ export default function UrbexDbPage() {
             <section className="panel rounded-[32px] p-6">
               <p className="eyebrow">Approved locations</p>
               <div className="mt-5 space-y-3">
-                {approvedLocations.map((location) => (
+                {filteredLocations.map((location) => (
                   <div key={location.id} className="rounded-[24px] bg-white/80 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-base font-semibold">{location.title}</p>
@@ -196,10 +404,18 @@ export default function UrbexDbPage() {
                     </div>
                     <p className="mt-2 text-sm text-[var(--text-muted)]">{location.description}</p>
                     <p className="mt-3 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                      {location.region} • Submitted by {location.submittedBy}
+                      {location.region} • {location.state} • {location.address}
+                    </p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                      Submitted by {location.submittedBy}
                     </p>
                   </div>
                 ))}
+                {filteredLocations.length === 0 ? (
+                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    No approved locations match that area search yet.
+                  </div>
+                ) : null}
               </div>
             </section>
 
@@ -228,7 +444,10 @@ export default function UrbexDbPage() {
                     </div>
                     <p className="mt-2 text-sm text-[var(--text-muted)]">{submission.note}</p>
                     <p className="mt-3 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                      {submission.region} • {submission.submittedBy} • {submission.createdAt}
+                      {submission.region} • {submission.state} • {submission.address}
+                    </p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                      {submission.submittedBy} • {submission.createdAt}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-3">
                       <button

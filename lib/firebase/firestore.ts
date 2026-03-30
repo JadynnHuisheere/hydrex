@@ -38,6 +38,8 @@ export type LocationRecord = {
   id: string;
   title: string;
   region: string;
+  state: string;
+  address: string;
   status: "approved" | "pending" | "rejected";
   points: number;
   lat: number;
@@ -56,6 +58,8 @@ export type SubmissionRecord = {
   images: number;
   note: string;
   region: string;
+  state: string;
+  address: string;
   points: number;
 };
 
@@ -553,6 +557,8 @@ export async function fetchApprovedLocations() {
       id: entry.id,
       title: String(data.title ?? "Untitled location"),
       region: String(data.region ?? "Unknown"),
+      state: String(data.state ?? "Unknown"),
+      address: String(data.address ?? "Address unavailable"),
       status: "approved" as const,
       points: Number(data.points ?? 0),
       lat: Number(data.lat ?? 0),
@@ -606,9 +612,69 @@ export async function fetchPendingSubmissions() {
       images: Number(data.images ?? 0),
       note: String(data.note ?? "Awaiting moderator review."),
       region: String(data.region ?? "Unknown"),
+      state: String(data.state ?? "Unknown"),
+      address: String(data.address ?? "Address unavailable"),
       points: Number(data.points ?? 25)
     };
   });
+}
+
+export async function submitLocationSubmission(input: {
+  uid: string;
+  submittedBy: string;
+  title: string;
+  region: string;
+  state: string;
+  address: string;
+  lat: number;
+  lng: number;
+  description: string;
+  note?: string;
+  images?: number;
+}) {
+  const app = getDb();
+
+  if (!app) {
+    return { ok: false, reason: "firebase-not-configured" } as const;
+  }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const title = input.title.trim();
+  const region = input.region.trim();
+  const state = input.state.trim();
+  const address = input.address.trim();
+  const description = input.description.trim();
+  const note = input.note?.trim() || "Awaiting moderator review.";
+  const images = Math.max(0, Number(input.images ?? 0));
+
+  if (title.length < 3 || region.length < 2 || state.length < 2 || address.length < 5 || description.length < 12) {
+    return { ok: false, reason: "invalid-submission" } as const;
+  }
+
+  if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
+    return { ok: false, reason: "invalid-coordinates" } as const;
+  }
+
+  await firestore.setDoc(firestore.doc(firestore.collection(db, "locations")), {
+    title,
+    region,
+    state,
+    address,
+    status: "pending",
+    points: 25,
+    lat: input.lat,
+    lng: input.lng,
+    description,
+    submittedBy: input.submittedBy,
+    submittedByUid: input.uid,
+    images,
+    note,
+    createdAt: firestore.serverTimestamp()
+  });
+
+  return { ok: true } as const;
 }
 
 export async function reviewSubmission(
@@ -722,6 +788,8 @@ export async function seedSampleLocations(uid: string, name: string) {
     {
       title: "Canal Pump House",
       region: "South Basin",
+      state: "London",
+      address: "14 Canal Walk, South Basin",
       status: "approved",
       points: 40,
       lat: 51.505,
@@ -736,6 +804,8 @@ export async function seedSampleLocations(uid: string, name: string) {
     {
       title: "North Yard Control Tower",
       region: "Rail Fringe",
+      state: "London",
+      address: "3 North Yard Road, Rail Fringe",
       status: "pending",
       points: 25,
       lat: 51.498,
