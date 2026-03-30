@@ -1,4 +1,4 @@
-name = "urbex-dashboard"
+name = "hydrexmain"
 main = ".open-next/worker.js"
 compatibility_date = "2026-03-30"
 compatibility_flags = ["nodejs_compat"]
@@ -9,10 +9,6 @@ binding = "ASSETS"
 
 [observability]
 enabled = true
-
-[[r2_buckets]]
-binding = "URBEX_UPLOADS"
-bucket_name = "urbex-dashboard-uploads"
 
 [vars]
 NEXT_PUBLIC_APP_NAME = "Urbex Dashboard"

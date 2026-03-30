@@ -51,3 +51,16 @@ Do not use `npm run build` followed by `npx wrangler deploy` for this project.
 `next build` alone does not generate the OpenNext compiled config needed by the
 OpenNext deploy step, which causes:
 `ERROR Could not find compiled Open Next config, did you run the build command?`
+
+### R2 note
+
+The current `wrangler.toml` intentionally deploys without an R2 binding so Workers
+Builds can succeed on accounts where R2 is not enabled yet.
+
+After enabling R2 in Cloudflare, add back:
+
+```toml
+[[r2_buckets]]
+binding = "URBEX_UPLOADS"
+bucket_name = "urbex-dashboard-uploads"
+```
