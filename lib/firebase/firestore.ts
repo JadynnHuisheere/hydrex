@@ -5,8 +5,8 @@ import { getFirebaseApp } from "@/lib/firebase/client";
 type FirestoreModule = typeof import("firebase/firestore");
 type Timestamp = import("firebase/firestore").Timestamp;
 
-export type UserRole = "base" | "licensed" | "admin";
-export type AppLicense = "urbex-db" | "leaderboard" | "moderation";
+export type UserRole = "base" | "licensed" | "mod" | "admin";
+export type AppLicense = "urbex-db" | "moderation";
 
 type AppAccessMap = Record<AppLicense, boolean>;
 
@@ -51,9 +51,12 @@ export type SubmissionRecord = {
   id: string;
   title: string;
   submittedBy: string;
+  submittedByUid?: string;
   createdAt: string;
   images: number;
   note: string;
+  region: string;
+  points: number;
 };
 
 const LICENSE_KEY_PATTERN = /^HYDREX-\d{8}$/;
@@ -61,14 +64,12 @@ const BOOTSTRAP_ADMIN_KEY = "HYDREX-90000001";
 
 const defaultAppAccess = (): AppAccessMap => ({
   "urbex-db": false,
-  leaderboard: false,
   moderation: false
 });
 
 export const licenseApps: Array<{ id: AppLicense; label: string }> = [
-  { id: "urbex-db", label: "Urbex DB" },
-  { id: "leaderboard", label: "Leaderboard" },
-  { id: "moderation", label: "Moderation" }
+  { id: "urbex-db", label: "Urbex DB access" },
+  { id: "moderation", label: "Moderator role" }
 ];
 
 function getDb() {
@@ -95,7 +96,6 @@ function normalizeAppAccess(raw: unknown): AppAccessMap {
 
   return {
     "urbex-db": Boolean(source["urbex-db"]),
-    leaderboard: Boolean(source.leaderboard),
     moderation: Boolean(source.moderation)
   };
 }
@@ -123,7 +123,7 @@ function mapAdminUser(uid: string, data: Record<string, unknown>): AdminUserReco
 }
 
 function isKnownApp(value: unknown): value is AppLicense {
-  return value === "urbex-db" || value === "leaderboard" || value === "moderation";
+  return value === "urbex-db" || value === "moderation";
 }
 
 function nextHydrexKey() {
@@ -147,12 +147,71 @@ function getErrorReason(error: unknown) {
   return "unknown-error";
 }
 
+function isModeratorRole(role: UserRole) {
+  return role === "mod" || role === "admin";
+}
+
+function nextAccessForRole(role: UserRole, existing: AppAccessMap): AppAccessMap {
+  if (role === "admin" || role === "mod") {
+    return {
+      "urbex-db": true,
+      moderation: true
+    };
+  }
+
+  if (role === "licensed") {
+    return {
+      "urbex-db": existing["urbex-db"],
+      moderation: false
+    };
+  }
+
+  return {
+    "urbex-db": false,
+    moderation: false
+  };
+}
+
+function nextRoleForRedeemedApp(currentRole: UserRole, app: AppLicense): UserRole {
+  if (currentRole === "admin") {
+    return "admin";
+  }
+
+  if (app === "moderation") {
+    return "mod";
+  }
+
+  if (currentRole === "mod") {
+    return "mod";
+  }
+
+  return "licensed";
+}
+
+function nextAccessForRedeemedApp(current: AppAccessMap, app: AppLicense): AppAccessMap {
+  if (app === "moderation") {
+    return {
+      "urbex-db": true,
+      moderation: true
+    };
+  }
+
+  return {
+    ...current,
+    "urbex-db": true
+  };
+}
+
 export function hasAppAccess(profile: UserProfile | null, app: AppLicense) {
   if (!profile) {
     return false;
   }
 
   if (profile.role === "admin") {
+    return true;
+  }
+
+  if (app === "urbex-db" && isModeratorRole(profile.role)) {
     return true;
   }
 
@@ -238,6 +297,7 @@ export async function redeemLicense(uid: string, key: string) {
       }
 
       const userData = userSnap.data() as Record<string, unknown>;
+      const userRole = (userData.role as UserRole) ?? "base";
       const userAccess = normalizeAppAccess(userData.appAccess);
 
       if (!keySnap.exists()) {
@@ -260,7 +320,6 @@ export async function redeemLicense(uid: string, key: string) {
           licenseRedeemed: true,
           appAccess: {
             "urbex-db": true,
-            leaderboard: true,
             moderation: true
           },
           updatedAt: firestore.serverTimestamp()
@@ -293,7 +352,6 @@ export async function redeemLicense(uid: string, key: string) {
           licenseRedeemed: true,
           appAccess: {
             "urbex-db": true,
-            leaderboard: true,
             moderation: true
           },
           updatedAt: firestore.serverTimestamp()
@@ -307,7 +365,12 @@ export async function redeemLicense(uid: string, key: string) {
         throw new Error("invalid-key-app");
       }
 
-      if (userAccess[keyData.app]) {
+      const nextAccess = nextAccessForRedeemedApp(userAccess, keyData.app);
+      const alreadyHasTarget = keyData.app === "moderation"
+        ? nextAccessForRole(userRole, userAccess).moderation
+        : userAccess["urbex-db"];
+
+      if (alreadyHasTarget) {
         throw new Error("already-has-app-access");
       }
 
@@ -316,13 +379,8 @@ export async function redeemLicense(uid: string, key: string) {
         redeemedAt: firestore.serverTimestamp()
       });
 
-      const nextAccess = {
-        ...userAccess,
-        [keyData.app]: true
-      };
-
       tx.update(userRef, {
-        role: userData.role === "admin" ? "admin" : "licensed",
+        role: nextRoleForRedeemedApp(userRole, keyData.app),
         licenseRedeemed: true,
         appAccess: nextAccess,
         updatedAt: firestore.serverTimestamp()
@@ -410,7 +468,7 @@ export async function fetchUsersForAdmin(adminUid: string) {
 export async function updateUserStatsAsAdmin(
   adminUid: string,
   targetUid: string,
-  values: { score: number; approvedSubmissions: number }
+  values: { score: number; approvedSubmissions: number; role: UserRole }
 ) {
   const app = getDb();
 
@@ -434,9 +492,15 @@ export async function updateUserStatsAsAdmin(
     return { ok: false, reason: "user-not-found" } as const;
   }
 
+  const targetData = targetSnap.data() as Record<string, unknown>;
+  const nextAccess = nextAccessForRole(values.role, normalizeAppAccess(targetData.appAccess));
+
   await firestore.updateDoc(firestore.doc(db, "users", targetUid), {
+    role: values.role,
     score: Math.max(0, Number(values.score)),
     approvedSubmissions: Math.max(0, Number(values.approvedSubmissions)),
+    appAccess: nextAccess,
+    licenseRedeemed: values.role === "base" ? false : Boolean(targetData.licenseRedeemed) || nextAccess["urbex-db"],
     updatedAt: firestore.serverTimestamp()
   });
 
@@ -537,11 +601,103 @@ export async function fetchPendingSubmissions() {
       id: entry.id,
       title: String(data.title ?? "Untitled submission"),
       submittedBy: String(data.submittedBy ?? "Unknown"),
+      submittedByUid: typeof data.submittedByUid === "string" ? data.submittedByUid : undefined,
       createdAt: createdAt ? createdAt.toDate().toLocaleString() : "unknown time",
       images: Number(data.images ?? 0),
-      note: String(data.note ?? "Awaiting moderator review.")
+      note: String(data.note ?? "Awaiting moderator review."),
+      region: String(data.region ?? "Unknown"),
+      points: Number(data.points ?? 25)
     };
   });
+}
+
+export async function reviewSubmission(
+  actorUid: string,
+  submissionId: string,
+  decision: "approved" | "rejected"
+) {
+  const app = getDb();
+
+  if (!app) {
+    return { ok: false, reason: "firebase-not-configured" } as const;
+  }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  try {
+    await firestore.runTransaction(db, async (tx) => {
+      const actorRef = firestore.doc(db, "users", actorUid);
+      const submissionRef = firestore.doc(db, "locations", submissionId);
+
+      const [actorSnap, submissionSnap] = await Promise.all([tx.get(actorRef), tx.get(submissionRef)]);
+
+      if (!actorSnap.exists()) {
+        throw new Error("user-not-found");
+      }
+
+      const actorRole = (actorSnap.data().role as UserRole) ?? "base";
+
+      if (!isModeratorRole(actorRole)) {
+        throw new Error("not-moderator");
+      }
+
+      if (!submissionSnap.exists()) {
+        throw new Error("submission-not-found");
+      }
+
+      const submissionData = submissionSnap.data() as Record<string, unknown>;
+
+      if (submissionData.status !== "pending") {
+        throw new Error("already-reviewed");
+      }
+
+      const commonUpdate = {
+        reviewedByUid: actorUid,
+        reviewedAt: firestore.serverTimestamp()
+      };
+
+      if (decision === "approved") {
+        const awardedPoints = Math.max(0, Number(submissionData.points ?? 25));
+
+        tx.update(submissionRef, {
+          ...commonUpdate,
+          status: "approved",
+          points: awardedPoints,
+          note: "Approved by moderation."
+        });
+
+        if (typeof submissionData.submittedByUid === "string") {
+          const submitterRef = firestore.doc(db, "users", submissionData.submittedByUid);
+          const submitterSnap = await tx.get(submitterRef);
+
+          if (submitterSnap.exists()) {
+            const submitterData = submitterSnap.data() as Record<string, unknown>;
+            tx.update(submitterRef, {
+              score: Number(submitterData.score ?? 0) + awardedPoints,
+              approvedSubmissions: Number(submitterData.approvedSubmissions ?? 0) + 1,
+              updatedAt: firestore.serverTimestamp()
+            });
+          }
+        }
+
+        return;
+      }
+
+      tx.update(submissionRef, {
+        ...commonUpdate,
+        status: "rejected",
+        note: "Declined by moderation."
+      });
+    });
+
+    return { ok: true } as const;
+  } catch (error) {
+    return {
+      ok: false,
+      reason: getErrorReason(error)
+    } as const;
+  }
 }
 
 export async function seedSampleLocations(uid: string, name: string) {
@@ -581,7 +737,7 @@ export async function seedSampleLocations(uid: string, name: string) {
       title: "North Yard Control Tower",
       region: "Rail Fringe",
       status: "pending",
-      points: 0,
+      points: 25,
       lat: 51.498,
       lng: -0.082,
       description: "Pending moderator review. Exterior access confirmed, interior route unverified.",
@@ -614,9 +770,9 @@ export async function promoteUserToAdmin(uid: string) {
     role: "admin",
     appAccess: {
       "urbex-db": true,
-      leaderboard: true,
       moderation: true
     },
+    licenseRedeemed: true,
     updatedAt: firestore.serverTimestamp()
   });
 }

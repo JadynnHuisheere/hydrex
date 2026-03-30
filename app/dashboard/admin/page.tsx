@@ -11,8 +11,11 @@ import {
   licenseApps,
   updateUserStatsAsAdmin,
   type AdminUserRecord,
-  type AppLicense
+  type AppLicense,
+  type UserRole
 } from "@/lib/firebase/firestore";
+
+const editableRoles: UserRole[] = ["base", "licensed", "mod", "admin"];
 
 export default function AdminPage() {
   const { loading, user, profile } = useAuth();
@@ -90,6 +93,7 @@ export default function AdminPage() {
     const targetUid = String(formData.get("uid") ?? "");
     const score = Number(formData.get("score") ?? 0);
     const approvedSubmissions = Number(formData.get("approvedSubmissions") ?? 0);
+    const role = String(formData.get("role") ?? "base") as UserRole;
 
     if (!targetUid) {
       return;
@@ -100,7 +104,8 @@ export default function AdminPage() {
 
     const result = await updateUserStatsAsAdmin(user.uid, targetUid, {
       score,
-      approvedSubmissions
+      approvedSubmissions,
+      role
     });
 
     if (!result.ok) {
@@ -121,7 +126,7 @@ export default function AdminPage() {
           <p className="eyebrow">Admin controls</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Users, stats, and license keys</h1>
           <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
-            Admin keys are single-use. App keys are generated as HYDREX-######## and bound to one app.
+            App keys are generated as HYDREX-########. Moderator role can be issued by key or assigned directly here.
           </p>
         </section>
 
@@ -160,7 +165,7 @@ export default function AdminPage() {
             {generatedKey ? (
               <div className="mt-5 rounded-2xl bg-white/80 p-4 text-sm text-[var(--text-muted)]">
                 <p className="font-semibold text-[var(--text)]">{generatedKey}</p>
-                <p className="mt-2">Single-use key for {selectedApp}.</p>
+                <p className="mt-2">Single-use key for {selectedApp === "urbex-db" ? "Urbex DB" : "moderator role"}.</p>
               </div>
             ) : null}
 
@@ -217,6 +222,20 @@ export default function AdminPage() {
                         defaultValue={entry.approvedSubmissions}
                         className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-[var(--text)] outline-none"
                       />
+                    </label>
+                    <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                      <span>Role</span>
+                      <select
+                        name="role"
+                        defaultValue={entry.role}
+                        className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-[var(--text)] outline-none"
+                      >
+                        {editableRoles.map((roleOption) => (
+                          <option key={roleOption} value={roleOption}>
+                            {roleOption}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                   </div>
 

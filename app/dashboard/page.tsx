@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, LockKeyhole, Map, Shield, Trophy } from "lucide-react";
+import { ArrowRight, LockKeyhole, Map } from "lucide-react";
 
 import {
   FirebaseConfigWarning,
@@ -18,22 +18,8 @@ const appCards = [
     title: "Urbex DB",
     app: "urbex-db" as AppLicense,
     href: "/dashboard/urbex-db",
-    description: "Interactive map, approved pins, pending submission pipeline, and moderator handoff.",
+    description: "Interactive map, Urbex leaderboard, submissions, and moderator tools in one shell.",
     icon: Map
-  },
-  {
-    title: "Leaderboard",
-    app: "leaderboard" as AppLicense,
-    href: "/dashboard/leaderboard",
-    description: "Public contribution ranking focused on approved submissions.",
-    icon: Trophy
-  },
-  {
-    title: "Moderation",
-    app: "moderation" as AppLicense,
-    href: "/dashboard/urbex-db#queue",
-    description: "Current queue view is embedded in the Urbex DB shell for admins.",
-    icon: Shield
   }
 ];
 
@@ -74,7 +60,7 @@ export default function DashboardPage() {
                 {appConfig.name}
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
-                Access now uses Firebase Authentication and Firestore profile roles.
+                Urbex DB now contains the map, leaderboard, submissions, and moderator tools behind one access flow.
               </p>
             </div>
 
@@ -156,8 +142,7 @@ export default function DashboardPage() {
               <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--text-muted)]">
                 <p>Auth provider: {firebaseReady ? "Firebase" : "not configured"}</p>
                 <p>Urbex DB access: {hasAppAccess(profile, "urbex-db") ? "yes" : "no"}</p>
-                <p>Leaderboard access: {hasAppAccess(profile, "leaderboard") ? "yes" : "no"}</p>
-                <p>Moderation access: {hasAppAccess(profile, "moderation") ? "yes" : "no"}</p>
+                <p>Moderator tools: {profile?.role === "mod" || profile?.role === "admin" ? "yes" : "no"}</p>
                 <p>Cloudflare adapter: configured through OpenNext and Wrangler.</p>
               </div>
             </section>

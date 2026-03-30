@@ -11,6 +11,7 @@ import {
   fetchLeaderboard,
   fetchPendingSubmissions,
   hasAppAccess,
+  reviewSubmission,
   type LocationRecord,
   type SubmissionRecord,
   type UserProfile
@@ -36,9 +37,23 @@ export default function UrbexDbPage() {
   const [approvedLocations, setApprovedLocations] = useState<LocationRecord[]>([]);
   const [pendingSubmissions, setPendingSubmissions] = useState<SubmissionRecord[]>([]);
   const [leaderboard, setLeaderboard] = useState<RankedUser[]>([]);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [moderationMessage, setModerationMessage] = useState<string | null>(null);
 
   const hasUrbexAccess = hasAppAccess(profile, "urbex-db");
-  const canModerate = profile?.role === "admin" || hasAppAccess(profile, "moderation");
+  const canModerate = profile?.role === "admin" || profile?.role === "mod" || hasAppAccess(profile, "moderation");
+
+  async function refreshPanels() {
+    const [nextApproved, nextPending, nextLeaderboard] = await Promise.all([
+      fetchApprovedLocations(),
+      fetchPendingSubmissions(),
+      fetchLeaderboard()
+    ]);
+
+    setApprovedLocations(nextApproved);
+    setPendingSubmissions(nextPending);
+    setLeaderboard(nextLeaderboard);
+  }
 
   useEffect(() => {
     if (!loading && !user) {
@@ -52,13 +67,30 @@ export default function UrbexDbPage() {
     }
 
     if (!loading && user && hasUrbexAccess) {
-      void Promise.all([
-        fetchApprovedLocations().then(setApprovedLocations),
-        fetchPendingSubmissions().then(setPendingSubmissions),
-        fetchLeaderboard().then(setLeaderboard)
-      ]);
+      void refreshPanels();
     }
   }, [hasUrbexAccess, loading, router, user]);
+
+  async function onReview(submissionId: string, decision: "approved" | "rejected") {
+    if (!user) {
+      return;
+    }
+
+    setReviewingId(submissionId);
+    setModerationMessage(null);
+
+    const result = await reviewSubmission(user.uid, submissionId, decision);
+
+    if (!result.ok) {
+      setModerationMessage("Could not update that submission right now.");
+      setReviewingId(null);
+      return;
+    }
+
+    setModerationMessage(decision === "approved" ? "Submission approved." : "Submission declined.");
+    await refreshPanels();
+    setReviewingId(null);
+  }
 
   const leaderboardTop = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
 
@@ -127,6 +159,32 @@ export default function UrbexDbPage() {
           </div>
 
           <div className="space-y-6">
+            {canModerate ? (
+              <section className="panel rounded-[32px] p-6">
+                <p className="eyebrow">Moderator menu</p>
+                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    <p className="text-xs uppercase tracking-[0.18em]">Pending queue</p>
+                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{pendingSubmissions.length}</p>
+                  </div>
+                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    <p className="text-xs uppercase tracking-[0.18em]">Approved pins</p>
+                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{approvedLocations.length}</p>
+                  </div>
+                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    <p className="text-xs uppercase tracking-[0.18em]">Role</p>
+                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{profile?.role ?? "base"}</p>
+                  </div>
+                </div>
+
+                {moderationMessage ? (
+                  <div className="mt-5 rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    {moderationMessage}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
             <section className="panel rounded-[32px] p-6">
               <p className="eyebrow">Approved locations</p>
               <div className="mt-5 space-y-3">
@@ -170,14 +228,36 @@ export default function UrbexDbPage() {
                     </div>
                     <p className="mt-2 text-sm text-[var(--text-muted)]">{submission.note}</p>
                     <p className="mt-3 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                      {submission.submittedBy} • {submission.createdAt}
+                      {submission.region} • {submission.submittedBy} • {submission.createdAt}
                     </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        disabled={reviewingId === submission.id}
+                        onClick={() => {
+                          void onReview(submission.id, "approved");
+                        }}
+                        className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {reviewingId === submission.id ? "Working..." : `Approve (+${submission.points})`}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={reviewingId === submission.id}
+                        onClick={() => {
+                          void onReview(submission.id, "rejected");
+                        }}
+                        className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Decline
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             </section>
 
-            <section className="panel rounded-[32px] p-6">
+            <section id="leaderboard" className="panel rounded-[32px] p-6">
               <p className="eyebrow">Leaderboard snapshot</p>
               <div className="mt-5 space-y-3">
                 {leaderboardTop.length === 0 ? (
