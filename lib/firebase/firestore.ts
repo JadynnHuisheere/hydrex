@@ -1,22 +1,9 @@
 "use client";
 
-import {
-  Timestamp,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  getFirestore,
-  limit,
-  query,
-  runTransaction,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where
-} from "firebase/firestore";
-
 import { getFirebaseApp } from "@/lib/firebase/client";
+
+type FirestoreModule = typeof import("firebase/firestore");
+type Timestamp = import("firebase/firestore").Timestamp;
 
 export type UserRole = "base" | "licensed" | "admin";
 
@@ -61,7 +48,11 @@ function getDb() {
     return null;
   }
 
-  return getFirestore(app);
+  return app;
+}
+
+async function loadFirestore() {
+  return import("firebase/firestore") as Promise<FirestoreModule>;
 }
 
 function mapUserProfile(uid: string, data: Record<string, unknown>): UserProfile {
@@ -77,39 +68,45 @@ function mapUserProfile(uid: string, data: Record<string, unknown>): UserProfile
 }
 
 export async function ensureUserProfile(uid: string, email: string, name?: string) {
-  const db = getDb();
+  const app = getDb();
 
-  if (!db) {
+  if (!app) {
     return null;
   }
 
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const ref = firestore.doc(db, "users", uid);
+  const snap = await firestore.getDoc(ref);
 
   if (!snap.exists()) {
-    await setDoc(ref, {
+    await firestore.setDoc(ref, {
       email,
       name: name ?? email.split("@")[0] ?? "Explorer",
       role: "base",
       score: 0,
       approvedSubmissions: 0,
       licenseRedeemed: false,
-      createdAt: serverTimestamp()
+      createdAt: firestore.serverTimestamp()
     });
   }
 
-  const after = await getDoc(ref);
+  const after = await firestore.getDoc(ref);
   return mapUserProfile(uid, (after.data() ?? {}) as Record<string, unknown>);
 }
 
 export async function fetchUserProfile(uid: string) {
-  const db = getDb();
+  const app = getDb();
 
-  if (!db) {
+  if (!app) {
     return null;
   }
 
-  const snap = await getDoc(doc(db, "users", uid));
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const snap = await firestore.getDoc(firestore.doc(db, "users", uid));
 
   if (!snap.exists()) {
     return null;
@@ -119,11 +116,14 @@ export async function fetchUserProfile(uid: string) {
 }
 
 export async function redeemLicense(uid: string, key: string) {
-  const db = getDb();
+  const app = getDb();
 
-  if (!db) {
+  if (!app) {
     return { ok: false, reason: "firebase-not-configured" } as const;
   }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
 
   const normalized = key.trim().toUpperCase();
 
@@ -132,9 +132,9 @@ export async function redeemLicense(uid: string, key: string) {
   }
 
   try {
-    await runTransaction(db, async (tx) => {
-      const userRef = doc(db, "users", uid);
-      const keyRef = doc(db, "licenseKeys", normalized);
+    await firestore.runTransaction(db, async (tx) => {
+      const userRef = firestore.doc(db, "users", uid);
+      const keyRef = firestore.doc(db, "licenseKeys", normalized);
 
       const [userSnap, keySnap] = await Promise.all([tx.get(userRef), tx.get(keyRef)]);
 
@@ -156,9 +156,9 @@ export async function redeemLicense(uid: string, key: string) {
         tx.set(keyRef, {
           active: true,
           issuedBy: "bootstrap",
-          createdAt: serverTimestamp(),
+          createdAt: firestore.serverTimestamp(),
           redeemedBy: uid,
-          redeemedAt: serverTimestamp()
+          redeemedAt: firestore.serverTimestamp()
         });
       } else {
         const existing = keySnap.data() as Record<string, unknown>;
@@ -173,7 +173,7 @@ export async function redeemLicense(uid: string, key: string) {
 
         tx.update(keyRef, {
           redeemedBy: uid,
-          redeemedAt: serverTimestamp()
+          redeemedAt: firestore.serverTimestamp()
         });
       }
 
@@ -181,7 +181,7 @@ export async function redeemLicense(uid: string, key: string) {
         role: "licensed",
         licenseRedeemed: true,
         licenseKey: normalized,
-        updatedAt: serverTimestamp()
+        updatedAt: firestore.serverTimestamp()
       });
     });
 
@@ -195,14 +195,20 @@ export async function redeemLicense(uid: string, key: string) {
 }
 
 export async function fetchLeaderboard() {
-  const db = getDb();
+  const app = getDb();
 
-  if (!db) {
+  if (!app) {
     return [] as Array<UserProfile & { rank: number }>;
   }
 
-  const usersQuery = query(collection(db, "users"), limit(50));
-  const snap = await getDocs(usersQuery);
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const usersQuery = firestore.query(
+    firestore.collection(db, "users"),
+    firestore.limit(50)
+  );
+  const snap = await firestore.getDocs(usersQuery);
   const sorted = [...snap.docs].sort(
     (a, b) => Number(b.data().score ?? 0) - Number(a.data().score ?? 0)
   );
@@ -214,18 +220,21 @@ export async function fetchLeaderboard() {
 }
 
 export async function fetchApprovedLocations() {
-  const db = getDb();
+  const app = getDb();
 
-  if (!db) {
+  if (!app) {
     return [] as LocationRecord[];
   }
 
-  const locationsQuery = query(
-    collection(db, "locations"),
-    where("status", "==", "approved"),
-    limit(200)
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const locationsQuery = firestore.query(
+    firestore.collection(db, "locations"),
+    firestore.where("status", "==", "approved"),
+    firestore.limit(200)
   );
-  const snap = await getDocs(locationsQuery);
+  const snap = await firestore.getDocs(locationsQuery);
 
   const mapped = snap.docs.map((entry) => {
     const data = entry.data() as Record<string, unknown>;
@@ -252,18 +261,21 @@ export async function fetchApprovedLocations() {
 }
 
 export async function fetchPendingSubmissions() {
-  const db = getDb();
+  const app = getDb();
 
-  if (!db) {
+  if (!app) {
     return [] as SubmissionRecord[];
   }
 
-  const submissionsQuery = query(
-    collection(db, "locations"),
-    where("status", "==", "pending"),
-    limit(50)
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const submissionsQuery = firestore.query(
+    firestore.collection(db, "locations"),
+    firestore.where("status", "==", "pending"),
+    firestore.limit(50)
   );
-  const snap = await getDocs(submissionsQuery);
+  const snap = await firestore.getDocs(submissionsQuery);
 
   const sorted = [...snap.docs].sort((a, b) => {
     const left = (a.data().createdAt as Timestamp | undefined)?.toMillis() ?? 0;
@@ -287,13 +299,18 @@ export async function fetchPendingSubmissions() {
 }
 
 export async function seedSampleLocations(uid: string, name: string) {
-  const db = getDb();
+  const app = getDb();
 
-  if (!db) {
+  if (!app) {
     return;
   }
 
-  const existing = await getDocs(query(collection(db, "locations"), limit(1)));
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const existing = await firestore.getDocs(
+    firestore.query(firestore.collection(db, "locations"), firestore.limit(1))
+  );
 
   if (!existing.empty) {
     return;
@@ -312,7 +329,7 @@ export async function seedSampleLocations(uid: string, name: string) {
       submittedByUid: uid,
       images: 1,
       note: "Initial seed",
-      createdAt: serverTimestamp()
+      createdAt: firestore.serverTimestamp()
     },
     {
       title: "North Yard Control Tower",
@@ -326,22 +343,29 @@ export async function seedSampleLocations(uid: string, name: string) {
       submittedByUid: uid,
       images: 0,
       note: "Awaiting proof image before moderator decision.",
-      createdAt: serverTimestamp()
+      createdAt: firestore.serverTimestamp()
     }
   ];
 
-  await Promise.all(entries.map((entry) => setDoc(doc(collection(db, "locations")), entry)));
+  await Promise.all(
+    entries.map((entry) =>
+      firestore.setDoc(firestore.doc(firestore.collection(db, "locations")), entry)
+    )
+  );
 }
 
 export async function promoteUserToAdmin(uid: string) {
-  const db = getDb();
+  const app = getDb();
 
-  if (!db) {
+  if (!app) {
     return;
   }
 
-  await updateDoc(doc(db, "users", uid), {
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  await firestore.updateDoc(firestore.doc(db, "users", uid), {
     role: "admin",
-    updatedAt: serverTimestamp()
+    updatedAt: firestore.serverTimestamp()
   });
 }
