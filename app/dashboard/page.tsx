@@ -1,10 +1,16 @@
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ArrowRight, LockKeyhole, Map, Shield, Trophy } from "lucide-react";
 
-import { logoutAction } from "@/app/dashboard/actions";
-import { getSession, hasLicensedAccess } from "@/lib/auth/session";
-import { appConfig, isSupabaseConfigured } from "@/lib/config";
+import {
+  FirebaseConfigWarning,
+  FirebaseProjectBadge,
+  useAuth
+} from "@/components/auth-provider";
+import { appConfig } from "@/lib/config";
 
 const appCards = [
   {
@@ -30,19 +36,33 @@ const appCards = [
   }
 ];
 
-export default async function DashboardPage({
-  searchParams
-}: {
-  searchParams: Promise<{ redeemed?: string; welcome?: string }>;
-}) {
-  const session = await getSession();
+export default function DashboardPage() {
+  const { loading, user, profile, firebaseReady, signOutUser } = useAuth();
+  const router = useRouter();
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showRedeemed, setShowRedeemed] = useState(false);
 
-  if (!session) {
-    redirect("/login");
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, router, user]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setShowWelcome(params.has("welcome"));
+    setShowRedeemed(params.has("redeemed"));
+  }, []);
+
+  const licensed = profile?.role === "licensed" || profile?.role === "admin";
+
+  if (loading || !user || !profile) {
+    return (
+      <main className="app-shell flex items-center justify-center text-sm text-[var(--text-muted)]">
+        Loading dashboard...
+      </main>
+    );
   }
-
-  const params = await searchParams;
-  const licensed = hasLicensedAccess(session);
 
   return (
     <main className="app-shell">
@@ -55,26 +75,29 @@ export default async function DashboardPage({
                 {appConfig.name}
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
-                Access is controlled by session role today. Supabase wiring is prepared but still
-                awaiting environment variables.
+                Access now uses Firebase Authentication and Firestore profile roles.
               </p>
             </div>
 
             <div className="panel rounded-[28px] px-5 py-4 text-sm text-[var(--text-muted)]">
               <p className="eyebrow">Current session</p>
-              <p className="mt-2 text-lg font-semibold text-[var(--text)]">{session.name}</p>
-              <p>{session.email}</p>
-              <p className="mt-1 uppercase tracking-[0.18em]">Role: {session.role}</p>
+              <p className="mt-2 text-lg font-semibold text-[var(--text)]">{profile.name}</p>
+              <p>{profile.email}</p>
+              <p className="mt-1 uppercase tracking-[0.18em]">Role: {profile.role}</p>
             </div>
           </div>
 
-          {params.welcome ? (
+          <div className="mt-6">
+            <FirebaseConfigWarning />
+          </div>
+
+          {showWelcome ? (
             <div className="mt-6 rounded-3xl border border-[var(--olive)]/20 bg-[var(--olive)]/10 px-4 py-3 text-sm text-[var(--olive)]">
               Base account created. Redeem a key when you are ready to unlock premium app access.
             </div>
           ) : null}
 
-          {params.redeemed ? (
+          {showRedeemed ? (
             <div className="mt-6 rounded-3xl border border-[var(--olive)]/20 bg-[var(--olive)]/10 px-4 py-3 text-sm text-[var(--olive)]">
               License redeemed. Urbex DB is now unlocked for this session.
             </div>
@@ -122,8 +145,8 @@ export default async function DashboardPage({
             <section className="panel rounded-[28px] p-6">
               <p className="eyebrow">Implementation status</p>
               <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--text-muted)]">
-                <p>Demo auth: {appConfig.demoAuthEnabled ? "enabled" : "disabled"}</p>
-                <p>Supabase env: {isSupabaseConfigured ? "configured" : "not configured"}</p>
+                <p>Auth provider: {firebaseReady ? "Firebase" : "not configured"}</p>
+                <p>License redeemed: {profile.licenseRedeemed ? "yes" : "no"}</p>
                 <p>Cloudflare adapter: configured through OpenNext and Wrangler.</p>
               </div>
             </section>
@@ -131,20 +154,27 @@ export default async function DashboardPage({
             <section className="panel rounded-[28px] p-6">
               <p className="eyebrow">Next implementation targets</p>
               <ul className="mt-5 space-y-3 text-sm leading-7 text-[var(--text-muted)]">
-                <li>Replace demo auth with Supabase session-backed identity.</li>
-                <li>Add database tables for submissions, licenses, and scores.</li>
-                <li>Move license redemption from mock keys into persistent storage.</li>
+                <li>Add location submission writes to Firestore with moderation queue flow.</li>
+                <li>Enable R2 and signed uploads for submission media.</li>
+                <li>Automate license key issuance from Patreon webhook sync.</li>
               </ul>
             </section>
 
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="w-full rounded-full border border-[var(--line)] bg-white/70 px-5 py-3 text-sm font-semibold"
-              >
-                Log out
-              </button>
-            </form>
+            <div className="panel rounded-[28px] p-6">
+              <FirebaseProjectBadge />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                void signOutUser().then(() => {
+                  router.replace("/");
+                });
+              }}
+              className="w-full rounded-full border border-[var(--line)] bg-white/70 px-5 py-3 text-sm font-semibold"
+            >
+              Log out
+            </button>
           </aside>
         </section>
       </div>

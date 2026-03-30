@@ -5,17 +5,17 @@ Cloudflare-first Next.js foundation for the Urbex Dashboard platform.
 ## Current slice
 
 - Landing page and product framing
-- Demo auth flow with cookie-backed sessions
+- Firebase email/password auth flow
 - Gated dashboard with locked app states
-- License redemption prototype
-- Urbex DB shell with live Leaflet map and seeded markers
+- Firestore-backed license redemption
+- Urbex DB shell with live Leaflet map and Firestore-backed records
 
 ## Stack
 
 - Next.js App Router
 - Tailwind CSS v4
 - OpenNext adapter for Cloudflare Workers
-- Supabase-ready environment wiring
+- Firebase Authentication + Firestore + Analytics
 - Leaflet for map rendering
 
 ## Local development
@@ -24,13 +24,34 @@ Cloudflare-first Next.js foundation for the Urbex Dashboard platform.
 2. Copy `.env.example` to `.env.local`.
 3. Run `npm run dev`.
 
-Demo accounts:
+In Firebase Console, enable:
 
-- `admin@urbex.local` / `DemoAdmin123`
-- `member@urbex.local` / `DemoMember123`
-- `user@urbex.local` / `DemoUser123`
+- Authentication: Email/Password provider
+- Firestore Database (Native mode)
 
-Demo license keys:
+For initial development, use Firestore rules that allow authenticated users to
+read/write required collections:
+
+```txt
+rules_version = '2';
+service cloud.firestore {
+	match /databases/{database}/documents {
+		match /users/{userId} {
+			allow read, write: if request.auth != null;
+		}
+		match /licenseKeys/{key} {
+			allow read, write: if request.auth != null;
+		}
+		match /locations/{locationId} {
+			allow read, write: if request.auth != null;
+		}
+	}
+}
+```
+
+Tighten these rules before production launch.
+
+Bootstrap license keys accepted by the app:
 
 - `URBEX-ALPHA-ACCESS`
 - `PATREON-LICENSE-2026`

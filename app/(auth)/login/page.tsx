@@ -1,28 +1,57 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
+"use client";
 
-import { loginAction } from "@/app/(auth)/actions";
-import { getSession } from "@/lib/auth/session";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { FirebaseConfigWarning, useAuth } from "@/components/auth-provider";
 
 const errorCopy: Record<string, string> = {
-  "invalid-input": "Enter a valid email and a password with at least 8 characters.",
-  "invalid-credentials": "That demo account was not recognized.",
-  "auth-provider-missing": "Supabase auth is not wired yet and demo auth has been disabled."
+  "auth/invalid-credential": "Invalid credentials. Check your email and password.",
+  "auth/invalid-email": "Enter a valid email address.",
+  "auth/missing-password": "Password is required.",
+  "firebase-not-configured": "Firebase is not configured for this environment."
 };
 
-export default async function LoginPage({
-  searchParams
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const session = await getSession();
+export default function LoginPage() {
+  const router = useRouter();
+  const { loading, user, signInWithEmail } = useAuth();
+  const [pending, setPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  if (session) {
-    redirect("/dashboard");
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace("/dashboard");
+    }
+  }, [loading, router, user]);
+
+  async function onSubmit(formData: FormData) {
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    if (!email || !password) {
+      setErrorMessage("Enter both email and password.");
+      return;
+    }
+
+    setPending(true);
+    setErrorMessage(null);
+
+    try {
+      await signInWithEmail(email, password);
+      router.replace("/dashboard");
+    } catch (error) {
+      const code =
+        typeof error === "object" && error && "code" in error
+          ? String((error as { code?: unknown }).code)
+          : error instanceof Error
+            ? error.message
+            : "unknown";
+      setErrorMessage(errorCopy[code] ?? "Unable to log in. Please try again.");
+    } finally {
+      setPending(false);
+    }
   }
-
-  const params = await searchParams;
-  const errorMessage = params.error ? errorCopy[params.error] : null;
 
   return (
     <main className="app-shell flex items-center justify-center">
@@ -30,9 +59,12 @@ export default async function LoginPage({
         <p className="eyebrow">Account access</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Log into the dashboard</h1>
         <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
-          This first implementation slice uses demo accounts until managed auth credentials are
-          configured.
+          Sign in with your Firebase email/password account.
         </p>
+
+        <div className="mt-4">
+          <FirebaseConfigWarning />
+        </div>
 
         {errorMessage ? (
           <div className="mt-6 rounded-3xl border border-[color:var(--danger)]/20 bg-[color:var(--danger)]/8 px-4 py-3 text-sm text-[var(--danger)]">
@@ -40,14 +72,18 @@ export default async function LoginPage({
           </div>
         ) : null}
 
-        <form action={loginAction} className="mt-8 space-y-4">
+        <form
+          action={(formData) => {
+            void onSubmit(formData);
+          }}
+          className="mt-8 space-y-4"
+        >
           <label className="block space-y-2 text-sm text-[var(--text-muted)]">
             <span>Email</span>
             <input
               name="email"
               type="email"
               required
-              defaultValue="member@urbex.local"
               className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
             />
           </label>
@@ -58,21 +94,21 @@ export default async function LoginPage({
               name="password"
               type="password"
               required
-              defaultValue="DemoMember123"
               className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
             />
           </label>
 
           <button
             type="submit"
+            disabled={pending || loading}
             className="w-full rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)]"
           >
-            Log in
+            {pending ? "Logging in..." : "Log in"}
           </button>
         </form>
 
         <div className="mt-6 text-sm text-[var(--text-muted)]">
-          Need a base account? <Link href="/signup" className="text-[var(--accent-strong)]">Sign up</Link>
+          Need an account? <Link href="/signup" className="text-[var(--accent-strong)]">Sign up</Link>
         </div>
       </div>
     </main>

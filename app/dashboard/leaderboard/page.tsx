@@ -1,14 +1,36 @@
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
-import { getSession } from "@/lib/auth/session";
-import { sampleLeaderboard } from "@/lib/mock/data";
+import { useAuth } from "@/components/auth-provider";
+import { fetchLeaderboard, type UserProfile } from "@/lib/firebase/firestore";
 
-export default async function LeaderboardPage() {
-  const session = await getSession();
+type RankedUser = UserProfile & { rank: number };
 
-  if (!session) {
-    redirect("/login");
+export default function LeaderboardPage() {
+  const { loading, user } = useAuth();
+  const router = useRouter();
+  const [entries, setEntries] = useState<RankedUser[]>([]);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+      return;
+    }
+
+    if (!loading && user) {
+      void fetchLeaderboard().then(setEntries);
+    }
+  }, [loading, router, user]);
+
+  if (loading || !user) {
+    return (
+      <main className="app-shell flex items-center justify-center text-sm text-[var(--text-muted)]">
+        Loading leaderboard...
+      </main>
+    );
   }
 
   return (
@@ -25,7 +47,13 @@ export default async function LeaderboardPage() {
 
         <section className="panel rounded-[32px] p-5">
           <div className="space-y-3">
-            {sampleLeaderboard.map((entry) => (
+            {entries.length === 0 ? (
+              <div className="rounded-[24px] bg-white/80 px-4 py-4 text-sm text-[var(--text-muted)]">
+                No scored users yet. Scores populate as submissions are approved.
+              </div>
+            ) : null}
+
+            {entries.map((entry) => (
               <div
                 key={entry.rank}
                 className="flex items-center justify-between rounded-[24px] bg-white/80 px-4 py-4"

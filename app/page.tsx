@@ -70,13 +70,13 @@ export default function HomePage() {
 
               <div className="mt-6 grid gap-4 text-sm text-[var(--text-muted)]">
                 <div className="rounded-3xl bg-white/70 p-4">
-                  Auth runs in demo mode until Supabase keys are configured.
+                  Auth is powered by Firebase Authentication with real account state.
                 </div>
                 <div className="rounded-3xl bg-white/70 p-4">
-                  Licensing already changes dashboard access so the gating model is testable.
+                  License redemption now updates Firestore user roles for gated app access.
                 </div>
                 <div className="rounded-3xl bg-white/70 p-4">
-                  Urbex DB renders approved sample pins in a live Leaflet map.
+                  Urbex DB reads approved pins and moderation queue data from Firestore.
                 </div>
               </div>
             </div>
@@ -96,10 +96,10 @@ export default function HomePage() {
         <section className="panel rounded-[32px] px-6 py-6 sm:px-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="eyebrow">Demo credentials</p>
+              <p className="eyebrow">Firebase-ready</p>
               <p className="mt-2 text-sm leading-7 text-[var(--text-muted)]">
-                Base: user@urbex.local / DemoUser123, Licensed: member@urbex.local /
-                DemoMember123, Admin: admin@urbex.local / DemoAdmin123
+                Create accounts from the signup page. Role defaults to base and upgrades to
+                licensed when a valid key is redeemed.
               </p>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">

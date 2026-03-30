@@ -1,22 +1,73 @@
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-import { UrbexMap } from "@/components/urbex-map";
-import { getSession, hasLicensedAccess } from "@/lib/auth/session";
-import { moderationQueue, sampleLeaderboard, sampleLocations } from "@/lib/mock/data";
+import { useAuth } from "@/components/auth-provider";
+import {
+  fetchApprovedLocations,
+  fetchLeaderboard,
+  fetchPendingSubmissions,
+  type LocationRecord,
+  type SubmissionRecord,
+  type UserProfile
+} from "@/lib/firebase/firestore";
 
-export default async function UrbexDbPage() {
-  const session = await getSession();
-
-  if (!session) {
-    redirect("/login");
+const UrbexMap = dynamic(
+  () => import("@/components/urbex-map").then((module) => module.UrbexMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[440px] items-center justify-center rounded-[24px] border border-[var(--line)] bg-white/70 text-sm text-[var(--text-muted)]">
+        Loading map...
+      </div>
+    )
   }
+);
 
-  if (!hasLicensedAccess(session)) {
-    redirect("/dashboard");
+type RankedUser = UserProfile & { rank: number };
+
+export default function UrbexDbPage() {
+  const { loading, user, profile } = useAuth();
+  const router = useRouter();
+  const [approvedLocations, setApprovedLocations] = useState<LocationRecord[]>([]);
+  const [pendingSubmissions, setPendingSubmissions] = useState<SubmissionRecord[]>([]);
+  const [leaderboard, setLeaderboard] = useState<RankedUser[]>([]);
+
+  const licensed = profile?.role === "licensed" || profile?.role === "admin";
+  const isAdmin = profile?.role === "admin";
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+      return;
+    }
+
+    if (!loading && user && !licensed) {
+      router.replace("/dashboard");
+      return;
+    }
+
+    if (!loading && user && licensed) {
+      void Promise.all([
+        fetchApprovedLocations().then(setApprovedLocations),
+        fetchPendingSubmissions().then(setPendingSubmissions),
+        fetchLeaderboard().then(setLeaderboard)
+      ]);
+    }
+  }, [licensed, loading, router, user]);
+
+  const leaderboardTop = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
+
+  if (loading || !user || !profile || !licensed) {
+    return (
+      <main className="app-shell flex items-center justify-center text-sm text-[var(--text-muted)]">
+        Loading Urbex DB...
+      </main>
+    );
   }
-
-  const approvedLocations = sampleLocations.filter((location) => location.status === "approved");
 
   return (
     <main className="app-shell">
@@ -96,7 +147,19 @@ export default async function UrbexDbPage() {
             <section id="queue" className="panel rounded-[32px] p-6">
               <p className="eyebrow">Moderation queue</p>
               <div className="mt-5 space-y-3">
-                {moderationQueue.map((submission) => (
+                {!isAdmin ? (
+                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    Moderator queue is visible only to admins.
+                  </div>
+                ) : null}
+
+                {isAdmin && pendingSubmissions.length === 0 ? (
+                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    No pending submissions.
+                  </div>
+                ) : null}
+
+                {isAdmin && pendingSubmissions.map((submission) => (
                   <div key={submission.id} className="rounded-[24px] bg-white/80 p-4">
                     <div className="flex items-center justify-between gap-4">
                       <p className="text-base font-semibold">{submission.title}</p>
@@ -116,7 +179,13 @@ export default async function UrbexDbPage() {
             <section className="panel rounded-[32px] p-6">
               <p className="eyebrow">Leaderboard snapshot</p>
               <div className="mt-5 space-y-3">
-                {sampleLeaderboard.slice(0, 3).map((entry) => (
+                {leaderboardTop.length === 0 ? (
+                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                    No ranked users yet.
+                  </div>
+                ) : null}
+
+                {leaderboardTop.map((entry) => (
                   <div key={entry.rank} className="flex items-center justify-between rounded-[24px] bg-white/80 px-4 py-3 text-sm">
                     <span className="font-semibold">#{entry.rank} {entry.name}</span>
                     <span className="text-[var(--text-muted)]">{entry.score} pts</span>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
+import { AuthProvider } from "@/components/auth-provider";
 import { FirebaseAnalytics } from "@/components/firebase-analytics";
 
 const display = Space_Grotesk({
@@ -33,8 +34,10 @@ export default function RootLayout({
         }}
       >
         <div className="grain" />
-        <FirebaseAnalytics />
-        {children}
+        <AuthProvider>
+          <FirebaseAnalytics />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
