@@ -1,6 +1,8 @@
 .next
 .open-next
 node_modules
+.tsbuildinfo
+*.tsbuildinfo
 .env*
 !.env.example
 cloudflare-env.d.ts
