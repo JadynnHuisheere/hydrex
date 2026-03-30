@@ -3,42 +3,34 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 
-import { appConfig, isFirebaseConfigured } from "@/lib/config";
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDqByh59Q6fUQfJdKWui-5mC2TrhjFxkZ0",
+  authDomain: "hydrex-8e0bb.firebaseapp.com",
+  projectId: "hydrex-8e0bb",
+  storageBucket: "hydrex-8e0bb.firebasestorage.app",
+  messagingSenderId: "2560035280",
+  appId: "1:2560035280:web:6246d4353cb5c6843811d5",
+  measurementId: "G-WDBLBE4P99"
+};
 
 let analyticsPromise: Promise<Analytics | null> | null = null;
 
 function createFirebaseApp(): FirebaseApp {
-  if (!isFirebaseConfigured) {
-    throw new Error("Firebase configuration is incomplete.");
-  }
-
   const existingApps = getApps();
 
   if (existingApps.length > 0) {
     return getApp();
   }
 
-  return initializeApp({
-    apiKey: appConfig.firebaseApiKey,
-    authDomain: appConfig.firebaseAuthDomain,
-    projectId: appConfig.firebaseProjectId,
-    storageBucket: appConfig.firebaseStorageBucket,
-    messagingSenderId: appConfig.firebaseMessagingSenderId,
-    appId: appConfig.firebaseAppId,
-    measurementId: appConfig.firebaseMeasurementId
-  });
+  return initializeApp(FIREBASE_CONFIG);
 }
 
 export function getFirebaseApp() {
-  if (!isFirebaseConfigured) {
-    return null;
-  }
-
   return createFirebaseApp();
 }
 
 export function initializeFirebaseAnalytics() {
-  if (!isFirebaseConfigured || typeof window === "undefined") {
+  if (typeof window === "undefined") {
     return Promise.resolve(null);
   }
 

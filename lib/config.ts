@@ -9,11 +9,4 @@ export const appConfig = {
   firebaseMeasurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-export const isFirebaseConfigured = Boolean(
-  appConfig.firebaseApiKey &&
-    appConfig.firebaseAuthDomain &&
-    appConfig.firebaseProjectId &&
-    appConfig.firebaseStorageBucket &&
-    appConfig.firebaseMessagingSenderId &&
-    appConfig.firebaseAppId
-);
+export const isFirebaseConfigured = true;
