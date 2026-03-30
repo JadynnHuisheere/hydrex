@@ -1,0 +1,95 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --background: #f4efe5;
+  --background-strong: #e8dfcf;
+  --surface: rgba(255, 250, 240, 0.76);
+  --surface-strong: rgba(255, 246, 230, 0.96);
+  --text: #1a1611;
+  --text-muted: #5f5546;
+  --line: rgba(30, 22, 11, 0.1);
+  --accent: #cb5f2f;
+  --accent-strong: #9f4015;
+  --olive: #5b6b3a;
+  --danger: #b43218;
+  --shadow: 0 24px 60px rgba(56, 38, 14, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(203, 95, 47, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(91, 107, 58, 0.18), transparent 22%),
+    linear-gradient(180deg, #f8f3ea 0%, #efe4d1 100%);
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background: transparent;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 32px 20px 64px;
+}
+
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image:
+    linear-gradient(transparent 0 49%, rgba(0, 0, 0, 0.5) 49% 51%, transparent 51%),
+    linear-gradient(90deg, transparent 0 49%, rgba(0, 0, 0, 0.3) 49% 51%, transparent 51%);
+  background-size: 6px 6px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+}
+
+.panel-strong {
+  border: 1px solid rgba(30, 22, 11, 0.12);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.map-frame .leaflet-container {
+  height: 100%;
+  width: 100%;
+  border-radius: 24px;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #fff5e8;
+  color: var(--text);
+}
