@@ -131,6 +131,22 @@ function nextHydrexKey() {
   return `HYDREX-${suffix}`;
 }
 
+function getErrorReason(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+
+    if (typeof code === "string") {
+      return code.replace("firestore/", "");
+    }
+  }
+
+  return "unknown-error";
+}
+
 export function hasAppAccess(profile: UserProfile | null, app: AppLicense) {
   if (!profile) {
     return false;
@@ -319,7 +335,7 @@ export async function redeemLicense(uid: string, key: string) {
   } catch (error) {
     return {
       ok: false,
-      reason: error instanceof Error ? error.message : "unknown-error"
+      reason: getErrorReason(error)
     } as const;
   }
 }

@@ -13,6 +13,7 @@ const errorCopy: Record<string, string> = {
   "already-has-app-access": "This account already has access for that app.",
   "key-inactive": "That key is inactive.",
   "invalid-key-app": "This key is tied to an unknown app.",
+  "permission-denied": "Firestore rules blocked this request. Ask admin to allow users and licenseKeys access.",
   "firebase-not-configured": "Firebase config is incomplete."
 };
 
