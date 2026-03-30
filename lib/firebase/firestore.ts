@@ -132,16 +132,16 @@ function nextHydrexKey() {
 }
 
 function getErrorReason(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
   if (error && typeof error === "object" && "code" in error) {
     const code = (error as { code?: unknown }).code;
 
     if (typeof code === "string") {
       return code.replace("firestore/", "");
     }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
   }
 
   return "unknown-error";
