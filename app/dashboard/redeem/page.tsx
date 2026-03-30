@@ -7,17 +7,18 @@ import { FirebaseConfigWarning, useAuth } from "@/components/auth-provider";
 import { redeemLicense } from "@/lib/firebase/firestore";
 
 const errorCopy: Record<string, string> = {
-  "invalid-key": "Enter a license key before redeeming.",
+  "invalid-key-format": "Use the key format HYDREX-########.",
   "key-not-found": "That key was not recognized in Firebase licenseKeys.",
   "already-used": "That key has already been redeemed.",
-  "already-licensed": "This account already has licensed access.",
+  "already-has-app-access": "This account already has access for that app.",
   "key-inactive": "That key is inactive.",
+  "invalid-key-app": "This key is tied to an unknown app.",
   "firebase-not-configured": "Firebase config is incomplete."
 };
 
 export default function RedeemPage() {
   const router = useRouter();
-  const { loading, user, profile, refreshProfile } = useAuth();
+  const { loading, user, refreshProfile } = useAuth();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -27,10 +28,7 @@ export default function RedeemPage() {
       return;
     }
 
-    if (profile?.role === "licensed" || profile?.role === "admin") {
-      router.replace("/dashboard?redeemed=1");
-    }
-  }, [loading, profile?.role, router, user]);
+  }, [loading, router, user]);
 
   if (loading || !user) {
     return (
@@ -65,9 +63,9 @@ export default function RedeemPage() {
     <main className="app-shell flex items-center justify-center">
       <div className="panel-strong w-full max-w-xl rounded-[32px] p-8">
         <p className="eyebrow">License redemption</p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Unlock Urbex DB</h1>
+        <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Unlock apps</h1>
         <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
-          This screen validates keys in Firestore `licenseKeys` and upgrades your user role.
+          Redeem one HYDREX key at a time. Each key unlocks one app, or promotes to admin if it is an admin key.
         </p>
 
         <div className="mt-4">
@@ -91,7 +89,7 @@ export default function RedeemPage() {
             <input
               name="key"
               required
-              defaultValue="URBEX-ALPHA-ACCESS"
+              placeholder="HYDREX-12345678"
               className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 uppercase tracking-[0.12em] text-[var(--text)] outline-none transition focus:border-[var(--accent)]"
             />
           </label>
@@ -106,7 +104,7 @@ export default function RedeemPage() {
         </form>
 
         <div className="mt-6 rounded-3xl bg-white/70 p-4 text-sm text-[var(--text-muted)]">
-          Bootstrap keys accepted: URBEX-ALPHA-ACCESS and PATREON-LICENSE-2026
+          Format required: HYDREX-########
         </div>
       </div>
     </main>

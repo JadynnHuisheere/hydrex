@@ -11,28 +11,29 @@ import {
   useAuth
 } from "@/components/auth-provider";
 import { appConfig } from "@/lib/config";
+import { hasAppAccess, type AppLicense } from "@/lib/firebase/firestore";
 
 const appCards = [
   {
     title: "Urbex DB",
+    app: "urbex-db" as AppLicense,
     href: "/dashboard/urbex-db",
     description: "Interactive map, approved pins, pending submission pipeline, and moderator handoff.",
-    icon: Map,
-    requiresLicense: true
+    icon: Map
   },
   {
     title: "Leaderboard",
+    app: "leaderboard" as AppLicense,
     href: "/dashboard/leaderboard",
     description: "Public contribution ranking focused on approved submissions.",
-    icon: Trophy,
-    requiresLicense: false
+    icon: Trophy
   },
   {
     title: "Moderation",
+    app: "moderation" as AppLicense,
     href: "/dashboard/urbex-db#queue",
     description: "Current queue view is embedded in the Urbex DB shell for admins.",
-    icon: Shield,
-    requiresLicense: true
+    icon: Shield
   }
 ];
 
@@ -53,8 +54,6 @@ export default function DashboardPage() {
     setShowWelcome(params.has("welcome"));
     setShowRedeemed(params.has("redeemed"));
   }, []);
-
-  const licensed = profile?.role === "licensed" || profile?.role === "admin";
 
   if (loading || !user) {
     return (
@@ -106,8 +105,8 @@ export default function DashboardPage() {
 
         <section className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {appCards.map(({ title, href, description, icon: Icon, requiresLicense }) => {
-              const locked = requiresLicense && !licensed;
+            {appCards.map(({ title, href, description, icon: Icon, app }) => {
+              const locked = !hasAppAccess(profile, app);
 
               return (
                 <article key={title} className="panel rounded-[28px] p-6">
@@ -119,13 +118,9 @@ export default function DashboardPage() {
                   <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">{description}</p>
                   <div className="mt-6">
                     {locked ? (
-                      <Link
-                        href="/dashboard/redeem"
-                        className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold"
-                      >
-                        Unlock access
-                        <ArrowRight className="size-4" />
-                      </Link>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold text-[var(--text-muted)]">
+                        Unlock from sidebar
+                      </span>
                     ) : (
                       <Link
                         href={href}
@@ -143,13 +138,45 @@ export default function DashboardPage() {
 
           <aside className="space-y-5">
             <section className="panel rounded-[28px] p-6">
+              <p className="eyebrow">Unlock key</p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                Redeem a `HYDREX-########` key to unlock app access from a single flow.
+              </p>
+              <Link
+                href="/dashboard/redeem"
+                className="mt-5 inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)]"
+              >
+                Unlock key
+                <ArrowRight className="size-4" />
+              </Link>
+            </section>
+
+            <section className="panel rounded-[28px] p-6">
               <p className="eyebrow">Implementation status</p>
               <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--text-muted)]">
                 <p>Auth provider: {firebaseReady ? "Firebase" : "not configured"}</p>
-                <p>License redeemed: {profile?.licenseRedeemed ? "yes" : "no"}</p>
+                <p>Urbex DB access: {hasAppAccess(profile, "urbex-db") ? "yes" : "no"}</p>
+                <p>Leaderboard access: {hasAppAccess(profile, "leaderboard") ? "yes" : "no"}</p>
+                <p>Moderation access: {hasAppAccess(profile, "moderation") ? "yes" : "no"}</p>
                 <p>Cloudflare adapter: configured through OpenNext and Wrangler.</p>
               </div>
             </section>
+
+            {profile?.role === "admin" ? (
+              <section className="panel rounded-[28px] p-6">
+                <p className="eyebrow">Admin controls</p>
+                <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                  Manage users, tune stats, and generate app keys from one place.
+                </p>
+                <Link
+                  href="/dashboard/admin"
+                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold"
+                >
+                  Open admin panel
+                  <ArrowRight className="size-4" />
+                </Link>
+              </section>
+            ) : null}
 
             <section className="panel rounded-[28px] p-6">
               <p className="eyebrow">Next implementation targets</p>

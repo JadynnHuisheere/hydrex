@@ -6,6 +6,17 @@ type FirestoreModule = typeof import("firebase/firestore");
 type Timestamp = import("firebase/firestore").Timestamp;
 
 export type UserRole = "base" | "licensed" | "admin";
+export type AppLicense = "urbex-db" | "leaderboard" | "moderation";
+
+type AppAccessMap = Record<AppLicense, boolean>;
+
+type LicenseKeyRecord = {
+  app?: AppLicense;
+  active?: boolean;
+  keyType?: "app" | "admin";
+  singleUse?: boolean;
+  redeemedBy?: string;
+};
 
 export type UserProfile = {
   uid: string;
@@ -15,6 +26,12 @@ export type UserProfile = {
   score: number;
   approvedSubmissions: number;
   licenseRedeemed: boolean;
+  appAccess: AppAccessMap;
+};
+
+export type AdminUserRecord = UserProfile & {
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type LocationRecord = {
@@ -39,7 +56,20 @@ export type SubmissionRecord = {
   note: string;
 };
 
-const bootstrapLicenseKeys = ["URBEX-ALPHA-ACCESS", "PATREON-LICENSE-2026"];
+const LICENSE_KEY_PATTERN = /^HYDREX-\d{8}$/;
+const BOOTSTRAP_ADMIN_KEY = "HYDREX-90000001";
+
+const defaultAppAccess = (): AppAccessMap => ({
+  "urbex-db": false,
+  leaderboard: false,
+  moderation: false
+});
+
+export const licenseApps: Array<{ id: AppLicense; label: string }> = [
+  { id: "urbex-db", label: "Urbex DB" },
+  { id: "leaderboard", label: "Leaderboard" },
+  { id: "moderation", label: "Moderation" }
+];
 
 function getDb() {
   const app = getFirebaseApp();
@@ -55,6 +85,21 @@ async function loadFirestore() {
   return import("firebase/firestore") as Promise<FirestoreModule>;
 }
 
+function toIsoString(value: unknown) {
+  const ts = value as Timestamp | undefined;
+  return ts ? ts.toDate().toISOString() : undefined;
+}
+
+function normalizeAppAccess(raw: unknown): AppAccessMap {
+  const source = (raw ?? {}) as Record<string, unknown>;
+
+  return {
+    "urbex-db": Boolean(source["urbex-db"]),
+    leaderboard: Boolean(source.leaderboard),
+    moderation: Boolean(source.moderation)
+  };
+}
+
 function mapUserProfile(uid: string, data: Record<string, unknown>): UserProfile {
   return {
     uid,
@@ -63,8 +108,39 @@ function mapUserProfile(uid: string, data: Record<string, unknown>): UserProfile
     role: (data.role as UserRole) ?? "base",
     score: Number(data.score ?? 0),
     approvedSubmissions: Number(data.approvedSubmissions ?? 0),
-    licenseRedeemed: Boolean(data.licenseRedeemed ?? false)
+    licenseRedeemed: Boolean(data.licenseRedeemed ?? false),
+    appAccess: normalizeAppAccess(data.appAccess)
   };
+}
+
+function mapAdminUser(uid: string, data: Record<string, unknown>): AdminUserRecord {
+  const profile = mapUserProfile(uid, data);
+  return {
+    ...profile,
+    createdAt: toIsoString(data.createdAt),
+    updatedAt: toIsoString(data.updatedAt)
+  };
+}
+
+function isKnownApp(value: unknown): value is AppLicense {
+  return value === "urbex-db" || value === "leaderboard" || value === "moderation";
+}
+
+function nextHydrexKey() {
+  const suffix = Math.floor(10000000 + Math.random() * 90000000);
+  return `HYDREX-${suffix}`;
+}
+
+export function hasAppAccess(profile: UserProfile | null, app: AppLicense) {
+  if (!profile) {
+    return false;
+  }
+
+  if (profile.role === "admin") {
+    return true;
+  }
+
+  return Boolean(profile.appAccess?.[app]);
 }
 
 export async function ensureUserProfile(uid: string, email: string, name?: string) {
@@ -88,7 +164,9 @@ export async function ensureUserProfile(uid: string, email: string, name?: strin
       score: 0,
       approvedSubmissions: 0,
       licenseRedeemed: false,
-      createdAt: firestore.serverTimestamp()
+      appAccess: defaultAppAccess(),
+      createdAt: firestore.serverTimestamp(),
+      updatedAt: firestore.serverTimestamp()
     });
   }
 
@@ -122,14 +200,15 @@ export async function redeemLicense(uid: string, key: string) {
     return { ok: false, reason: "firebase-not-configured" } as const;
   }
 
-  const firestore = await loadFirestore();
-  const db = firestore.getFirestore(app);
-
   const normalized = key.trim().toUpperCase();
 
-  if (normalized.length < 8) {
-    return { ok: false, reason: "invalid-key" } as const;
+  if (!LICENSE_KEY_PATTERN.test(normalized)) {
+    return { ok: false, reason: "invalid-key-format" } as const;
   }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+  let redeemedApp: AppLicense | "admin" | null = null;
 
   try {
     await firestore.runTransaction(db, async (tx) => {
@@ -142,56 +221,210 @@ export async function redeemLicense(uid: string, key: string) {
         throw new Error("user-not-found");
       }
 
-      const userRole = String(userSnap.data().role ?? "base") as UserRole;
-
-      if (userRole === "licensed" || userRole === "admin") {
-        throw new Error("already-licensed");
-      }
+      const userData = userSnap.data() as Record<string, unknown>;
+      const userAccess = normalizeAppAccess(userData.appAccess);
 
       if (!keySnap.exists()) {
-        if (!bootstrapLicenseKeys.includes(normalized)) {
+        if (normalized !== BOOTSTRAP_ADMIN_KEY) {
           throw new Error("key-not-found");
         }
 
         tx.set(keyRef, {
+          keyType: "admin",
           active: true,
+          singleUse: true,
           issuedBy: "bootstrap",
           createdAt: firestore.serverTimestamp(),
           redeemedBy: uid,
           redeemedAt: firestore.serverTimestamp()
         });
-      } else {
-        const existing = keySnap.data() as Record<string, unknown>;
 
-        if (existing.active === false) {
-          throw new Error("key-inactive");
-        }
+        tx.update(userRef, {
+          role: "admin",
+          licenseRedeemed: true,
+          appAccess: {
+            "urbex-db": true,
+            leaderboard: true,
+            moderation: true
+          },
+          updatedAt: firestore.serverTimestamp()
+        });
 
-        if (existing.redeemedBy) {
-          throw new Error("already-used");
-        }
+        redeemedApp = "admin";
+        return;
+      }
 
+      const keyData = keySnap.data() as LicenseKeyRecord;
+
+      if (keyData.active === false) {
+        throw new Error("key-inactive");
+      }
+
+      if (keyData.singleUse !== false && keyData.redeemedBy) {
+        throw new Error("already-used");
+      }
+
+      const keyType = keyData.keyType ?? "app";
+
+      if (keyType === "admin") {
         tx.update(keyRef, {
           redeemedBy: uid,
           redeemedAt: firestore.serverTimestamp()
         });
+
+        tx.update(userRef, {
+          role: "admin",
+          licenseRedeemed: true,
+          appAccess: {
+            "urbex-db": true,
+            leaderboard: true,
+            moderation: true
+          },
+          updatedAt: firestore.serverTimestamp()
+        });
+
+        redeemedApp = "admin";
+        return;
       }
 
+      if (!isKnownApp(keyData.app)) {
+        throw new Error("invalid-key-app");
+      }
+
+      if (userAccess[keyData.app]) {
+        throw new Error("already-has-app-access");
+      }
+
+      tx.update(keyRef, {
+        redeemedBy: uid,
+        redeemedAt: firestore.serverTimestamp()
+      });
+
+      const nextAccess = {
+        ...userAccess,
+        [keyData.app]: true
+      };
+
       tx.update(userRef, {
-        role: "licensed",
+        role: userData.role === "admin" ? "admin" : "licensed",
         licenseRedeemed: true,
-        licenseKey: normalized,
+        appAccess: nextAccess,
         updatedAt: firestore.serverTimestamp()
       });
+
+      redeemedApp = keyData.app;
     });
 
-    return { ok: true } as const;
+    return { ok: true, app: redeemedApp } as const;
   } catch (error) {
     return {
       ok: false,
       reason: error instanceof Error ? error.message : "unknown-error"
     } as const;
   }
+}
+
+export async function createLicenseKeyForApp(adminUid: string, appLicense: AppLicense) {
+  const app = getDb();
+
+  if (!app) {
+    return { ok: false, reason: "firebase-not-configured" } as const;
+  }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const adminSnap = await firestore.getDoc(firestore.doc(db, "users", adminUid));
+
+  if (!adminSnap.exists() || adminSnap.data().role !== "admin") {
+    return { ok: false, reason: "not-admin" } as const;
+  }
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const code = nextHydrexKey();
+    const keyRef = firestore.doc(db, "licenseKeys", code);
+    const keySnap = await firestore.getDoc(keyRef);
+
+    if (keySnap.exists()) {
+      continue;
+    }
+
+    await firestore.setDoc(keyRef, {
+      keyType: "app",
+      app: appLicense,
+      active: true,
+      singleUse: true,
+      createdAt: firestore.serverTimestamp(),
+      issuedBy: adminUid
+    });
+
+    return { ok: true, code } as const;
+  }
+
+  return { ok: false, reason: "key-generation-failed" } as const;
+}
+
+export async function fetchUsersForAdmin(adminUid: string) {
+  const app = getDb();
+
+  if (!app) {
+    return [] as AdminUserRecord[];
+  }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const adminSnap = await firestore.getDoc(firestore.doc(db, "users", adminUid));
+
+  if (!adminSnap.exists() || adminSnap.data().role !== "admin") {
+    return [] as AdminUserRecord[];
+  }
+
+  const usersSnap = await firestore.getDocs(
+    firestore.query(firestore.collection(db, "users"), firestore.limit(250))
+  );
+
+  const mapped = usersSnap.docs.map((entry) =>
+    mapAdminUser(entry.id, (entry.data() ?? {}) as Record<string, unknown>)
+  );
+
+  return mapped.sort((left, right) => right.score - left.score);
+}
+
+export async function updateUserStatsAsAdmin(
+  adminUid: string,
+  targetUid: string,
+  values: { score: number; approvedSubmissions: number }
+) {
+  const app = getDb();
+
+  if (!app) {
+    return { ok: false, reason: "firebase-not-configured" } as const;
+  }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const [adminSnap, targetSnap] = await Promise.all([
+    firestore.getDoc(firestore.doc(db, "users", adminUid)),
+    firestore.getDoc(firestore.doc(db, "users", targetUid))
+  ]);
+
+  if (!adminSnap.exists() || adminSnap.data().role !== "admin") {
+    return { ok: false, reason: "not-admin" } as const;
+  }
+
+  if (!targetSnap.exists()) {
+    return { ok: false, reason: "user-not-found" } as const;
+  }
+
+  await firestore.updateDoc(firestore.doc(db, "users", targetUid), {
+    score: Math.max(0, Number(values.score)),
+    approvedSubmissions: Math.max(0, Number(values.approvedSubmissions)),
+    updatedAt: firestore.serverTimestamp()
+  });
+
+  return { ok: true } as const;
 }
 
 export async function fetchLeaderboard() {
@@ -204,10 +437,7 @@ export async function fetchLeaderboard() {
   const firestore = await loadFirestore();
   const db = firestore.getFirestore(app);
 
-  const usersQuery = firestore.query(
-    firestore.collection(db, "users"),
-    firestore.limit(50)
-  );
+  const usersQuery = firestore.query(firestore.collection(db, "users"), firestore.limit(50));
   const snap = await firestore.getDocs(usersQuery);
   const sorted = [...snap.docs].sort(
     (a, b) => Number(b.data().score ?? 0) - Number(a.data().score ?? 0)
@@ -366,6 +596,11 @@ export async function promoteUserToAdmin(uid: string) {
 
   await firestore.updateDoc(firestore.doc(db, "users", uid), {
     role: "admin",
+    appAccess: {
+      "urbex-db": true,
+      leaderboard: true,
+      moderation: true
+    },
     updatedAt: firestore.serverTimestamp()
   });
 }

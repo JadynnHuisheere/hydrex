@@ -10,6 +10,7 @@ import {
   fetchApprovedLocations,
   fetchLeaderboard,
   fetchPendingSubmissions,
+  hasAppAccess,
   type LocationRecord,
   type SubmissionRecord,
   type UserProfile
@@ -36,8 +37,8 @@ export default function UrbexDbPage() {
   const [pendingSubmissions, setPendingSubmissions] = useState<SubmissionRecord[]>([]);
   const [leaderboard, setLeaderboard] = useState<RankedUser[]>([]);
 
-  const licensed = profile?.role === "licensed" || profile?.role === "admin";
-  const isAdmin = profile?.role === "admin";
+  const hasUrbexAccess = hasAppAccess(profile, "urbex-db");
+  const canModerate = profile?.role === "admin" || hasAppAccess(profile, "moderation");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -45,23 +46,23 @@ export default function UrbexDbPage() {
       return;
     }
 
-    if (!loading && user && !licensed) {
+    if (!loading && user && !hasUrbexAccess) {
       router.replace("/dashboard");
       return;
     }
 
-    if (!loading && user && licensed) {
+    if (!loading && user && hasUrbexAccess) {
       void Promise.all([
         fetchApprovedLocations().then(setApprovedLocations),
         fetchPendingSubmissions().then(setPendingSubmissions),
         fetchLeaderboard().then(setLeaderboard)
       ]);
     }
-  }, [licensed, loading, router, user]);
+  }, [hasUrbexAccess, loading, router, user]);
 
   const leaderboardTop = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
 
-  if (loading || !user || !licensed) {
+  if (loading || !user || !hasUrbexAccess) {
     return (
       <main className="app-shell flex items-center justify-center text-sm text-[var(--text-muted)]">
         Loading Urbex DB...
@@ -147,19 +148,19 @@ export default function UrbexDbPage() {
             <section id="queue" className="panel rounded-[32px] p-6">
               <p className="eyebrow">Moderation queue</p>
               <div className="mt-5 space-y-3">
-                {!isAdmin ? (
+                {!canModerate ? (
                   <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
                     Moderator queue is visible only to admins.
                   </div>
                 ) : null}
 
-                {isAdmin && pendingSubmissions.length === 0 ? (
+                {canModerate && pendingSubmissions.length === 0 ? (
                   <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
                     No pending submissions.
                   </div>
                 ) : null}
 
-                {isAdmin && pendingSubmissions.map((submission) => (
+                {canModerate && pendingSubmissions.map((submission) => (
                   <div key={submission.id} className="rounded-[24px] bg-white/80 p-4">
                     <div className="flex items-center justify-between gap-4">
                       <p className="text-base font-semibold">{submission.title}</p>

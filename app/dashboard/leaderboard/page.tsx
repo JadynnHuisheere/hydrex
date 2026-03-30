@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
-import { fetchLeaderboard, type UserProfile } from "@/lib/firebase/firestore";
+import { fetchLeaderboard, hasAppAccess, type UserProfile } from "@/lib/firebase/firestore";
 
 type RankedUser = UserProfile & { rank: number };
 
 export default function LeaderboardPage() {
-  const { loading, user } = useAuth();
+  const { loading, user, profile } = useAuth();
   const router = useRouter();
   const [entries, setEntries] = useState<RankedUser[]>([]);
+  const hasLeaderboardAccess = hasAppAccess(profile, "leaderboard");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -20,12 +21,17 @@ export default function LeaderboardPage() {
       return;
     }
 
-    if (!loading && user) {
+    if (!loading && user && !hasLeaderboardAccess) {
+      router.replace("/dashboard");
+      return;
+    }
+
+    if (!loading && user && hasLeaderboardAccess) {
       void fetchLeaderboard().then(setEntries);
     }
-  }, [loading, router, user]);
+  }, [hasLeaderboardAccess, loading, router, user]);
 
-  if (loading || !user) {
+  if (loading || !user || !hasLeaderboardAccess) {
     return (
       <main className="app-shell flex items-center justify-center text-sm text-[var(--text-muted)]">
         Loading leaderboard...
