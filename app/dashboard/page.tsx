@@ -51,7 +51,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell app-shell-compact">
       <div className="mx-auto flex max-w-6xl flex-col gap-8">
         <section className="panel-strong rounded-[32px] px-6 py-8 sm:px-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">

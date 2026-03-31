@@ -606,7 +606,7 @@ export default function UrbexDbPage() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell app-shell-compact">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         {showHeroHeader ? (
           <section className="panel-strong rounded-[18px] px-5 py-6 sm:px-6">

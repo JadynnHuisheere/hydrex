@@ -159,7 +159,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell app-shell-compact">
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="panel-strong rounded-[32px] px-6 py-8">
           <p className="eyebrow">Admin controls</p>
