@@ -30,6 +30,7 @@ type UrbexMapProps = {
   locations: LocationPin[];
   onSelectSubmissionPoint?: (point: { lat: number; lng: number }) => void;
   onOpenStreetView?: (point: { lat: number; lng: number; title: string }) => void;
+  onOpenPinForum?: (pin: LocationPin) => void;
   searchPoint?: { lat: number; lng: number; label: string } | null;
 };
 
@@ -181,7 +182,7 @@ function MapSearchFocus({ searchPoint }: { searchPoint: UrbexMapProps["searchPoi
   return null;
 }
 
-function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetView, searchPoint }: UrbexMapProps) {
+function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, searchPoint }: UrbexMapProps) {
   const [zoom, setZoom] = useState(14);
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
   const [tempPoint, setTempPoint] = useState<{ lat: number; lng: number } | null>(null);
@@ -219,6 +220,28 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
         <CircleMarker
           key={pin.id}
           center={[pin.lat, pin.lng]}
+          eventHandlers={
+            !pin.isCluster
+              ? {
+                  click: () => {
+                    onOpenPinForum?.({
+                      id: pin.id,
+                      title: pin.title,
+                      region: pin.region,
+                      state: pin.state,
+                      address: pin.address,
+                      images: pin.images,
+                      imageUrls: pin.imageUrls,
+                      media: pin.media,
+                      lat: pin.lat,
+                      lng: pin.lng,
+                      description: pin.description,
+                      submittedBy: pin.submittedBy
+                    });
+                  }
+                }
+              : undefined
+          }
           pathOptions={{
             color: pin.isCluster ? "var(--pin-cluster-stroke)" : "var(--pin-stroke)",
             fillColor: pin.isCluster ? "var(--pin-cluster-fill)" : "var(--pin-fill)",
@@ -296,6 +319,30 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
                 <button
                   type="button"
                   onClick={() => {
+                    onOpenPinForum?.({
+                      id: pin.id,
+                      title: pin.title,
+                      region: pin.region,
+                      state: pin.state,
+                      address: pin.address,
+                      images: pin.images,
+                      imageUrls: pin.imageUrls,
+                      media: pin.media,
+                      lat: pin.lat,
+                      lng: pin.lng,
+                      description: pin.description,
+                      submittedBy: pin.submittedBy
+                    });
+                  }}
+                  className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold"
+                >
+                  Open pin forum
+                </button>
+              ) : null}
+              {!pin.isCluster ? (
+                <button
+                  type="button"
+                  onClick={() => {
                     onOpenStreetView?.({ lat: pin.lat, lng: pin.lng, title: pin.title });
                   }}
                   className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold"
@@ -365,7 +412,7 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
   );
 }
 
-export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView, searchPoint }: UrbexMapProps) {
+export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, searchPoint }: UrbexMapProps) {
   const center = locations[0]
     ? ([locations[0].lat, locations[0].lng] as [number, number])
     : ([39.8283, -98.5795] as [number, number]);
@@ -382,6 +429,7 @@ export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView,
           locations={locations}
           onSelectSubmissionPoint={onSelectSubmissionPoint}
           onOpenStreetView={onOpenStreetView}
+          onOpenPinForum={onOpenPinForum}
           searchPoint={searchPoint}
         />
       </MapContainer>

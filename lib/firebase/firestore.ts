@@ -72,6 +72,16 @@ export type SubmissionRecord = {
   points: number;
 };
 
+export type ForumPostRecord = {
+  id: string;
+  locationId: string;
+  authorUid: string;
+  authorName: string;
+  message: string;
+  media: MediaAsset[];
+  createdAt: string;
+};
+
 const LICENSE_KEY_PATTERN = /^HYDREX-\d{8}$/;
 const BOOTSTRAP_ADMIN_KEY = "HYDREX-90000001";
 
@@ -726,23 +736,43 @@ export async function submitLocationSubmission(input: {
     return { ok: false, reason: "invalid-coordinates" } as const;
   }
 
-  await firestore.setDoc(firestore.doc(firestore.collection(db, "locations")), {
-    title,
-    region,
-    state,
-    address,
-    status: "pending",
-    points: 25,
-    lat: input.lat,
-    lng: input.lng,
-    description,
-    submittedBy: input.submittedBy,
-    submittedByUid: input.uid,
-    images,
-    media: normalizedMedia,
-    imageUrls,
-    note,
-    createdAt: firestore.serverTimestamp()
+  await firestore.runTransaction(db, async (tx) => {
+    const userRef = firestore.doc(db, "users", input.uid);
+    const locationRef = firestore.doc(firestore.collection(db, "locations"));
+    const userSnap = await tx.get(userRef);
+    const userData = userSnap.exists() ? (userSnap.data() as Record<string, unknown>) : null;
+    const userRole = (userData?.role as UserRole | undefined) ?? "base";
+    const autoApproved = isModeratorRole(userRole);
+    const awardedPoints = 25;
+
+    tx.set(locationRef, {
+      title,
+      region,
+      state,
+      address,
+      status: autoApproved ? "approved" : "pending",
+      points: awardedPoints,
+      lat: input.lat,
+      lng: input.lng,
+      description,
+      submittedBy: input.submittedBy,
+      submittedByUid: input.uid,
+      images,
+      media: normalizedMedia,
+      imageUrls,
+      note: autoApproved ? "Auto-approved moderator submission." : note,
+      createdAt: firestore.serverTimestamp(),
+      reviewedByUid: autoApproved ? input.uid : null,
+      reviewedAt: autoApproved ? firestore.serverTimestamp() : null
+    });
+
+    if (autoApproved && userSnap.exists()) {
+      tx.update(userRef, {
+        score: Number(userData?.score ?? 0) + awardedPoints,
+        approvedSubmissions: Number(userData?.approvedSubmissions ?? 0) + 1,
+        updatedAt: firestore.serverTimestamp()
+      });
+    }
   });
 
   return { ok: true } as const;
@@ -916,4 +946,73 @@ export async function promoteUserToAdmin(uid: string) {
     licenseRedeemed: true,
     updatedAt: firestore.serverTimestamp()
   });
+}
+
+export async function fetchLocationForumPosts(locationId: string) {
+  const app = getDb();
+
+  if (!app) {
+    return [] as ForumPostRecord[];
+  }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+
+  const snap = await firestore.getDocs(
+    firestore.query(firestore.collection(db, "locations", locationId, "forum"), firestore.limit(100))
+  );
+
+  const posts = snap.docs.map((entry) => {
+    const data = entry.data() as Record<string, unknown>;
+    const createdAt = data.createdAt as Timestamp | undefined;
+
+    return {
+      id: entry.id,
+      locationId,
+      authorUid: String(data.authorUid ?? "unknown"),
+      authorName: String(data.authorName ?? "Explorer"),
+      message: String(data.message ?? ""),
+      media: normalizeMedia(data.media),
+      createdAt: createdAt ? createdAt.toDate().toLocaleString() : "unknown time"
+    } satisfies ForumPostRecord;
+  });
+
+  return posts.reverse();
+}
+
+export async function createLocationForumPost(input: {
+  locationId: string;
+  uid: string;
+  authorName: string;
+  message: string;
+  media?: MediaAsset[];
+}) {
+  const app = getDb();
+
+  if (!app) {
+    return { ok: false, reason: "firebase-not-configured" } as const;
+  }
+
+  const firestore = await loadFirestore();
+  const db = firestore.getFirestore(app);
+  const message = input.message.trim();
+  const media = (input.media ?? []).filter((item) => /^https?:\/\//i.test(item.url)).slice(0, 8);
+
+  if (message.length < 2 && media.length === 0) {
+    return { ok: false, reason: "empty-forum-post" } as const;
+  }
+
+  try {
+    await firestore.setDoc(firestore.doc(firestore.collection(db, "locations", input.locationId, "forum")), {
+      authorUid: input.uid,
+      authorName: input.authorName,
+      message,
+      media,
+      createdAt: firestore.serverTimestamp()
+    });
+
+    return { ok: true } as const;
+  } catch (error) {
+    return { ok: false, reason: getErrorReason(error) } as const;
+  }
 }

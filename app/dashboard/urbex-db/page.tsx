@@ -7,9 +7,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import {
+  createLocationForumPost,
   fetchApprovedLocations,
   fetchLeaderboard,
+  fetchLocationForumPosts,
   fetchPendingSubmissions,
+  type ForumPostRecord,
   hasAppAccess,
   reviewSubmission,
   submitLocationSubmission,
@@ -32,6 +35,20 @@ const UrbexMap = dynamic(
 );
 
 type RankedUser = UserProfile & { rank: number };
+type SelectedPin = {
+  id: string;
+  title: string;
+  region: string;
+  state: string;
+  address: string;
+  lat: number;
+  lng: number;
+  description: string;
+  submittedBy: string;
+  images: number;
+  imageUrls: string[];
+  media: Array<{ kind: "image" | "video"; url: string }>;
+};
 
 export default function UrbexDbPage() {
   const { loading, user, profile } = useAuth();
@@ -52,9 +69,23 @@ export default function UrbexDbPage() {
   const [selectedState, setSelectedState] = useState("all");
   const [latValue, setLatValue] = useState("");
   const [lngValue, setLngValue] = useState("");
+  const [selectedPin, setSelectedPin] = useState<SelectedPin | null>(null);
+  const [forumPosts, setForumPosts] = useState<ForumPostRecord[]>([]);
+  const [forumMessage, setForumMessage] = useState<string | null>(null);
+  const [forumPending, setForumPending] = useState(false);
+  const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
+  const [forumFiles, setForumFiles] = useState<File[]>([]);
+  const [submissionDropActive, setSubmissionDropActive] = useState(false);
+  const [forumDropActive, setForumDropActive] = useState(false);
+  const [showSubmission, setShowSubmission] = useState(true);
+  const [showModeratorMenu, setShowModeratorMenu] = useState(true);
+  const [showApprovedLocations, setShowApprovedLocations] = useState(true);
+  const [showQueue, setShowQueue] = useState(true);
+  const [showLeaderboard, setShowLeaderboard] = useState(true);
   const submissionFormRef = useRef<HTMLFormElement | null>(null);
   const submissionTitleInputRef = useRef<HTMLInputElement | null>(null);
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
+  const forumMediaInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasUrbexAccess = hasAppAccess(profile, "urbex-db");
   const canModerate = profile?.role === "admin" || profile?.role === "mod" || hasAppAccess(profile, "moderation");
@@ -69,6 +100,70 @@ export default function UrbexDbPage() {
     setApprovedLocations(nextApproved);
     setPendingSubmissions(nextPending);
     setLeaderboard(nextLeaderboard);
+  }
+
+  function toAcceptedFiles(files: FileList | File[]) {
+    return Array.from(files)
+      .filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/"))
+      .slice(0, 8);
+  }
+
+  function appendSubmissionFiles(files: FileList | File[]) {
+    const accepted = toAcceptedFiles(files);
+    setSubmissionFiles((current) => [...current, ...accepted].slice(0, 8));
+  }
+
+  function appendForumFiles(files: FileList | File[]) {
+    const accepted = toAcceptedFiles(files);
+    setForumFiles((current) => [...current, ...accepted].slice(0, 8));
+  }
+
+  async function openPinForum(pin: SelectedPin) {
+    setSelectedPin(pin);
+    setForumPending(true);
+    setForumMessage(null);
+    const posts = await fetchLocationForumPosts(pin.id);
+    setForumPosts(posts);
+    setForumPending(false);
+  }
+
+  async function onCreateForumPost(formData: FormData) {
+    if (!user || !selectedPin) {
+      return;
+    }
+
+    setForumPending(true);
+    setForumMessage(null);
+
+    const upload = await uploadSubmissionMedia(user.uid, forumFiles);
+
+    if (!upload.ok) {
+      setForumMessage("Could not upload forum media right now.");
+      setForumPending(false);
+      return;
+    }
+
+    const result = await createLocationForumPost({
+      locationId: selectedPin.id,
+      uid: user.uid,
+      authorName: profile?.name ?? user.displayName ?? user.email ?? "Explorer",
+      message: String(formData.get("forumMessage") ?? ""),
+      media: upload.media
+    });
+
+    if (!result.ok) {
+      setForumMessage("Could not publish forum post.");
+      setForumPending(false);
+      return;
+    }
+
+    setForumFiles([]);
+    if (forumMediaInputRef.current) {
+      forumMediaInputRef.current.value = "";
+    }
+    setForumMessage("Forum post published.");
+    await openPinForum(selectedPin);
+    setForumPending(false);
   }
 
   useEffect(() => {
@@ -126,8 +221,7 @@ export default function UrbexDbPage() {
     setSubmissionPending(true);
     setSubmissionMessage(null);
 
-    const selectedFiles = (formData.getAll("mediaFiles") as File[]).filter((file) => file.size > 0);
-    const upload = await uploadSubmissionMedia(user.uid, selectedFiles);
+    const upload = await uploadSubmissionMedia(user.uid, submissionFiles);
 
     if (!upload.ok) {
       setSubmissionMessage("Could not upload media files. Check Firebase Storage rules and try again.");
@@ -168,10 +262,15 @@ export default function UrbexDbPage() {
     if (mediaInputRef.current) {
       mediaInputRef.current.value = "";
     }
+    setSubmissionFiles([]);
     setLatValue("");
     setLngValue("");
     setMapSelectionMessage(null);
-    setSubmissionMessage("Submission sent to the moderation queue.");
+    setSubmissionMessage(
+      canModerate
+        ? "Submission auto-approved and published."
+        : "Submission sent to the moderation queue."
+    );
     await refreshPanels();
     setSubmissionPending(false);
   }
@@ -345,14 +444,132 @@ export default function UrbexDbPage() {
                   </select>
                 </label>
               </div>
-              <UrbexMap
-                locations={filteredLocations}
-                onSelectSubmissionPoint={onSelectSubmissionPoint}
-                searchPoint={mapSearchPoint}
-                onOpenStreetView={(point) => {
-                  setStreetViewTarget(point);
-                }}
-              />
+              <div className={`grid gap-4 ${selectedPin ? "xl:grid-cols-[1.5fr_1fr]" : ""}`}>
+                <UrbexMap
+                  locations={filteredLocations}
+                  onSelectSubmissionPoint={onSelectSubmissionPoint}
+                  searchPoint={mapSearchPoint}
+                  onOpenPinForum={(pin) => {
+                    void openPinForum(pin);
+                  }}
+                  onOpenStreetView={(point) => {
+                    setStreetViewTarget(point);
+                  }}
+                />
+
+                {selectedPin ? (
+                  <aside className="panel rounded-[24px] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="eyebrow">Pin forum</p>
+                        <p className="mt-1 text-base font-semibold">{selectedPin.title}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPin(null);
+                          setForumPosts([]);
+                          setForumFiles([]);
+                        }}
+                        className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <p className="mt-3 text-xs text-[var(--text-muted)]">
+                      {selectedPin.region} • {selectedPin.state} • {selectedPin.address}
+                    </p>
+
+                    <form
+                      action={(formData) => {
+                        void onCreateForumPost(formData);
+                      }}
+                      className="mt-4 space-y-3"
+                    >
+                      <textarea
+                        name="forumMessage"
+                        rows={3}
+                        placeholder="Add notes, entry updates, conditions, or media context..."
+                        className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-2 text-sm text-[var(--text)] outline-none"
+                      />
+
+                      <div
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          setForumDropActive(true);
+                        }}
+                        onDragLeave={() => {
+                          setForumDropActive(false);
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          setForumDropActive(false);
+                          appendForumFiles(event.dataTransfer.files);
+                        }}
+                        className={`rounded-2xl border px-3 py-3 text-xs text-[var(--text-muted)] ${forumDropActive ? "border-[var(--accent)]" : "border-[var(--line)]"}`}
+                      >
+                        Drag images/videos here or upload
+                      </div>
+
+                      <input
+                        ref={forumMediaInputRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        multiple
+                        onChange={(event) => {
+                          if (event.target.files) {
+                            appendForumFiles(event.target.files);
+                          }
+                        }}
+                        className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-2 text-xs"
+                      />
+
+                      {forumFiles.length > 0 ? (
+                        <p className="text-xs text-[var(--text-muted)]">{forumFiles.length} media file(s) attached</p>
+                      ) : null}
+
+                      <button
+                        type="submit"
+                        disabled={forumPending}
+                        className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {forumPending ? "Posting..." : "Post to pin forum"}
+                      </button>
+                    </form>
+
+                    {forumMessage ? (
+                      <p className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">{forumMessage}</p>
+                    ) : null}
+
+                    <div className="mt-4 space-y-3">
+                      {forumPosts.length === 0 ? (
+                        <p className="rounded-xl bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">
+                          No forum posts yet for this pin.
+                        </p>
+                      ) : null}
+                      {forumPosts.map((post) => (
+                        <div key={post.id} className="rounded-xl bg-white/80 p-3">
+                          <p className="text-xs font-semibold">{post.authorName}</p>
+                          <p className="mt-1 text-xs text-[var(--text-muted)]">{post.createdAt}</p>
+                          {post.message ? <p className="mt-2 text-sm">{post.message}</p> : null}
+                          {post.media.length > 0 ? (
+                            <div className="mt-2 grid grid-cols-3 gap-2">
+                              {post.media.slice(0, 6).map((mediaItem) => (
+                                mediaItem.kind === "video" ? (
+                                  <video key={mediaItem.url} src={mediaItem.url} className="h-16 w-full rounded-md object-cover" controls preload="metadata" />
+                                ) : (
+                                  <img key={mediaItem.url} src={mediaItem.url} alt="Forum media" className="h-16 w-full rounded-md object-cover" loading="lazy" />
+                                )
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </aside>
+                ) : null}
+              </div>
               {mapSearchMessage ? (
                 <p className="mt-4 rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--text-muted)]">
                   {mapSearchMessage}
@@ -371,11 +588,23 @@ export default function UrbexDbPage() {
                   <p className="eyebrow">Submit a location</p>
                   <p className="mt-2 text-xl font-semibold">Send new spots into the moderation queue</p>
                 </div>
-                <span className="rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                  Urbex access enabled
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                    Urbex access enabled
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSubmission((current) => !current);
+                    }}
+                    className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold"
+                  >
+                    {showSubmission ? "Hide" : "Show"}
+                  </button>
+                </div>
               </div>
 
+              {showSubmission ? (
               <form
                 ref={submissionFormRef}
                 action={(formData) => {
@@ -466,14 +695,38 @@ export default function UrbexDbPage() {
                 <div className="grid gap-4 md:grid-cols-[1fr_180px]">
                   <label className="space-y-2 text-sm text-[var(--text-muted)]">
                     <span>Upload images/videos</span>
+                    <div
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setSubmissionDropActive(true);
+                      }}
+                      onDragLeave={() => {
+                        setSubmissionDropActive(false);
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        setSubmissionDropActive(false);
+                        appendSubmissionFiles(event.dataTransfer.files);
+                      }}
+                      className={`rounded-2xl border px-3 py-3 text-xs text-[var(--text-muted)] ${submissionDropActive ? "border-[var(--accent)]" : "border-[var(--line)]"}`}
+                    >
+                      Drag images/videos here or choose files below
+                    </div>
                     <input
                       ref={mediaInputRef}
-                      name="mediaFiles"
                       type="file"
                       accept="image/*,video/*"
                       multiple
+                      onChange={(event) => {
+                        if (event.target.files) {
+                          appendSubmissionFiles(event.target.files);
+                        }
+                      }}
                       className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                     />
+                    {submissionFiles.length > 0 ? (
+                      <p className="text-xs text-[var(--text-muted)]">{submissionFiles.length} media file(s) attached</p>
+                    ) : null}
                   </label>
                   <label className="space-y-2 text-sm text-[var(--text-muted)]">
                     <span>Image URLs</span>
@@ -524,38 +777,66 @@ export default function UrbexDbPage() {
                   {submissionPending ? "Submitting..." : "Submit to moderation"}
                 </button>
               </form>
+              ) : null}
             </article>
           </div>
 
           <div className="space-y-6">
             {canModerate ? (
               <section className="panel rounded-[32px] p-6">
-                <p className="eyebrow">Moderator menu</p>
-                <div className="mt-5 grid gap-4 md:grid-cols-3">
-                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                    <p className="text-xs uppercase tracking-[0.18em]">Pending queue</p>
-                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{pendingSubmissions.length}</p>
-                  </div>
-                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                    <p className="text-xs uppercase tracking-[0.18em]">Approved pins</p>
-                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{approvedLocations.length}</p>
-                  </div>
-                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                    <p className="text-xs uppercase tracking-[0.18em]">Role</p>
-                    <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{profile?.role ?? "base"}</p>
-                  </div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="eyebrow">Moderator menu</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModeratorMenu((current) => !current);
+                    }}
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                  >
+                    {showModeratorMenu ? "Hide" : "Show"}
+                  </button>
                 </div>
+                {showModeratorMenu ? (
+                  <>
+                    <div className="mt-5 grid gap-4 md:grid-cols-3">
+                      <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                        <p className="text-xs uppercase tracking-[0.18em]">Pending queue</p>
+                        <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{pendingSubmissions.length}</p>
+                      </div>
+                      <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                        <p className="text-xs uppercase tracking-[0.18em]">Approved pins</p>
+                        <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{approvedLocations.length}</p>
+                      </div>
+                      <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                        <p className="text-xs uppercase tracking-[0.18em]">Role</p>
+                        <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{profile?.role ?? "base"}</p>
+                      </div>
+                    </div>
 
-                {moderationMessage ? (
-                  <div className="mt-5 rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                    {moderationMessage}
-                  </div>
+                    {moderationMessage ? (
+                      <div className="mt-5 rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                        {moderationMessage}
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
               </section>
             ) : null}
 
             <section className="panel rounded-[32px] p-6">
-              <p className="eyebrow">Approved locations</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="eyebrow">Approved locations</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowApprovedLocations((current) => !current);
+                  }}
+                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                >
+                  {showApprovedLocations ? "Hide" : "Show"}
+                </button>
+              </div>
+              {showApprovedLocations ? (
               <div className="mt-5 space-y-3">
                 {filteredLocations.map((location) => (
                   <div key={location.id} className="rounded-[24px] bg-white/80 p-4">
@@ -578,10 +859,23 @@ export default function UrbexDbPage() {
                   </div>
                 ) : null}
               </div>
+              ) : null}
             </section>
 
             <section id="queue" className="panel rounded-[32px] p-6">
-              <p className="eyebrow">Moderation queue</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="eyebrow">Moderation queue</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQueue((current) => !current);
+                  }}
+                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                >
+                  {showQueue ? "Hide" : "Show"}
+                </button>
+              </div>
+              {showQueue ? (
               <div className="mt-5 space-y-3">
                 {!canModerate ? (
                   <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
@@ -635,10 +929,23 @@ export default function UrbexDbPage() {
                   </div>
                 ))}
               </div>
+              ) : null}
             </section>
 
             <section id="leaderboard" className="panel rounded-[32px] p-6">
-              <p className="eyebrow">Leaderboard top 50</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="eyebrow">Leaderboard top 50</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLeaderboard((current) => !current);
+                  }}
+                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                >
+                  {showLeaderboard ? "Hide" : "Show"}
+                </button>
+              </div>
+              {showLeaderboard ? (
               <div className="mt-5 space-y-3">
                 {leaderboardTop.length === 0 ? (
                   <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
@@ -653,6 +960,7 @@ export default function UrbexDbPage() {
                   </div>
                 ))}
               </div>
+              ) : null}
             </section>
           </div>
         </section>
