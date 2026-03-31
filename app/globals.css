@@ -78,6 +78,18 @@ textarea {
   font: inherit;
 }
 
+input,
+select,
+textarea {
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
 .app-shell {
   min-height: 100vh;
   padding: 32px 20px 64px;
@@ -124,4 +136,12 @@ textarea {
 .leaflet-popup-tip {
   background: var(--popup-surface);
   color: var(--text);
+}
+
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-white\/60,
+html[data-theme="dark"] .bg-white\/70,
+html[data-theme="dark"] .bg-white\/80 {
+  background-color: var(--surface-strong) !important;
+  color: var(--text) !important;
 }
