@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { LatLngBounds } from "leaflet";
 import {
   CircleMarker,
   MapContainer,
@@ -119,15 +118,6 @@ function clusterLocations(locations: LocationPin[], zoom: number) {
   });
 }
 
-function isInBounds(location: LocationPin, bounds: LatLngBounds | null) {
-  if (!bounds) {
-    return true;
-  }
-
-  const padded = bounds.pad(0.35);
-  return padded.contains([location.lat, location.lng]);
-}
-
 function MapSearchFocus({ searchPoint }: { searchPoint: UrbexMapProps["searchPoint"] }) {
   const map = useMap();
 
@@ -145,8 +135,7 @@ function MapSearchFocus({ searchPoint }: { searchPoint: UrbexMapProps["searchPoi
 }
 
 function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, clearTempPinToken, searchPoint }: UrbexMapProps) {
-  const [zoom, setZoom] = useState(14);
-  const [bounds, setBounds] = useState<LatLngBounds | null>(null);
+  const [zoom, setZoom] = useState(5);
   const [tempPoint, setTempPoint] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
@@ -156,28 +145,18 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
   useMapEvents({
     load(event) {
       setZoom(event.target.getZoom());
-      setBounds(event.target.getBounds());
-    },
-    moveend(event) {
-      setBounds(event.target.getBounds());
     },
     zoomend(event) {
       setZoom(event.target.getZoom());
-      setBounds(event.target.getBounds());
     },
     click(event) {
       setTempPoint({ lat: event.latlng.lat, lng: event.latlng.lng });
     }
   });
 
-  const visibleLocations = useMemo(
-    () => locations.filter((location) => isInBounds(location, bounds)),
-    [bounds, locations]
-  );
-
   const displayPins = useMemo(
-    () => clusterLocations(visibleLocations, zoom),
-    [visibleLocations, zoom]
+    () => clusterLocations(locations, zoom),
+    [locations, zoom]
   );
 
   return (
