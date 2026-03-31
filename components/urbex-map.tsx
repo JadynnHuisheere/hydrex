@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LatLngBounds } from "leaflet";
 import {
   CircleMarker,
   MapContainer,
   Popup,
   TileLayer,
+  useMap,
   useMapEvents
 } from "react-leaflet";
 
@@ -29,6 +30,7 @@ type UrbexMapProps = {
   locations: LocationPin[];
   onSelectSubmissionPoint?: (point: { lat: number; lng: number }) => void;
   onOpenStreetView?: (point: { lat: number; lng: number; title: string }) => void;
+  searchPoint?: { lat: number; lng: number; label: string } | null;
 };
 
 type DisplayPin = {
@@ -163,7 +165,23 @@ function isInBounds(location: LocationPin, bounds: LatLngBounds | null) {
   return padded.contains([location.lat, location.lng]);
 }
 
-function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetView }: UrbexMapProps) {
+function MapSearchFocus({ searchPoint }: { searchPoint: UrbexMapProps["searchPoint"] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!searchPoint) {
+      return;
+    }
+
+    map.flyTo([searchPoint.lat, searchPoint.lng], Math.max(map.getZoom(), 15), {
+      duration: 1.2
+    });
+  }, [map, searchPoint]);
+
+  return null;
+}
+
+function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetView, searchPoint }: UrbexMapProps) {
   const [zoom, setZoom] = useState(14);
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
   const [tempPoint, setTempPoint] = useState<{ lat: number; lng: number } | null>(null);
@@ -320,11 +338,34 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
           </Popup>
         </CircleMarker>
       ) : null}
+
+      {searchPoint ? (
+        <CircleMarker
+          center={[searchPoint.lat, searchPoint.lng]}
+          pathOptions={{
+            color: "#ffffff",
+            fillColor: "var(--accent)",
+            fillOpacity: 0.9,
+            weight: 3
+          }}
+          radius={10}
+        >
+          <Popup>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Address result</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{searchPoint.label}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {searchPoint.lat.toFixed(6)}, {searchPoint.lng.toFixed(6)}
+              </p>
+            </div>
+          </Popup>
+        </CircleMarker>
+      ) : null}
     </>
   );
 }
 
-export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView }: UrbexMapProps) {
+export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView, searchPoint }: UrbexMapProps) {
   const center = locations[0]
     ? ([locations[0].lat, locations[0].lng] as [number, number])
     : ([39.8283, -98.5795] as [number, number]);
@@ -332,6 +373,7 @@ export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView 
   return (
     <div className="map-frame h-[440px] overflow-hidden rounded-[24px] border border-[var(--line)]">
       <MapContainer center={center} zoom={5} scrollWheelZoom className="h-full w-full">
+        <MapSearchFocus searchPoint={searchPoint} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -340,6 +382,7 @@ export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView 
           locations={locations}
           onSelectSubmissionPoint={onSelectSubmissionPoint}
           onOpenStreetView={onOpenStreetView}
+          searchPoint={searchPoint}
         />
       </MapContainer>
     </div>

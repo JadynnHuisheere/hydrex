@@ -45,7 +45,10 @@ export default function UrbexDbPage() {
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [mapSelectionMessage, setMapSelectionMessage] = useState<string | null>(null);
   const [streetViewTarget, setStreetViewTarget] = useState<{ lat: number; lng: number; title: string } | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [mapSearchTerm, setMapSearchTerm] = useState("");
+  const [mapSearchPending, setMapSearchPending] = useState(false);
+  const [mapSearchMessage, setMapSearchMessage] = useState<string | null>(null);
+  const [mapSearchPoint, setMapSearchPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const [selectedState, setSelectedState] = useState("all");
   const [latValue, setLatValue] = useState("");
   const [lngValue, setLngValue] = useState("");
@@ -193,39 +196,73 @@ export default function UrbexDbPage() {
     }, 200);
   }
 
+  async function onMapSearch() {
+    const query = mapSearchTerm.trim();
+
+    if (query.length < 3) {
+      setMapSearchMessage("Enter a full street address to search.");
+      return;
+    }
+
+    setMapSearchPending(true);
+    setMapSearchMessage(null);
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`,
+        {
+          headers: {
+            Accept: "application/json"
+          }
+        }
+      );
+
+      if (!response.ok) {
+        setMapSearchMessage("Address search is unavailable right now.");
+        setMapSearchPending(false);
+        return;
+      }
+
+      const results = (await response.json()) as Array<{
+        lat?: string;
+        lon?: string;
+        display_name?: string;
+      }>;
+
+      const first = results[0];
+      const lat = Number(first?.lat ?? NaN);
+      const lng = Number(first?.lon ?? NaN);
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setMapSearchMessage("No address match found. Try adding city/state.");
+        setMapSearchPending(false);
+        return;
+      }
+
+      setMapSearchPoint({
+        lat,
+        lng,
+        label: first?.display_name ?? query
+      });
+      setMapSearchMessage(first?.display_name ?? "Address located on map.");
+    } catch {
+      setMapSearchMessage("Could not complete address search right now.");
+    }
+
+    setMapSearchPending(false);
+  }
+
   const leaderboardTop = useMemo(() => leaderboard.slice(0, 50), [leaderboard]);
   const availableStates = useMemo(
     () => Array.from(new Set(approvedLocations.map((location) => location.state))).sort(),
     [approvedLocations]
   );
   const filteredLocations = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-
     return approvedLocations.filter((location) => {
       const matchesState = selectedState === "all" || location.state === selectedState;
-
-      if (!matchesState) {
-        return false;
-      }
-
-      if (!query) {
-        return true;
-      }
-
-      const searchable = [
-        location.title,
-        location.region,
-        location.state,
-        location.address,
-        location.description,
-        location.submittedBy
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return searchable.includes(query);
+      return matchesState;
     });
-  }, [approvedLocations, searchTerm, selectedState]);
+  }, [approvedLocations, selectedState]);
 
   if (loading || !user || !hasUrbexAccess) {
     return (
@@ -264,17 +301,32 @@ export default function UrbexDbPage() {
                 <p className="text-sm text-[var(--text-muted)]">{filteredLocations.length} of {approvedLocations.length} approved locations</p>
               </div>
               <div className="grid gap-4 pb-5 md:grid-cols-[1.3fr_0.7fr]">
-                <label className="space-y-2 text-sm text-[var(--text-muted)]">
-                  <span>Search by title, address, state, region</span>
-                  <input
-                    value={searchTerm}
-                    onChange={(event) => {
-                      setSearchTerm(event.target.value);
-                    }}
-                    placeholder="Search locations in an area"
-                    className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
-                  />
-                </label>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void onMapSearch();
+                  }}
+                  className="space-y-2 text-sm text-[var(--text-muted)]"
+                >
+                  <span className="block">Street address search</span>
+                  <div className="flex gap-2">
+                    <input
+                      value={mapSearchTerm}
+                      onChange={(event) => {
+                        setMapSearchTerm(event.target.value);
+                      }}
+                      placeholder="Search like Google Maps (street, city, state)"
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={mapSearchPending}
+                      className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {mapSearchPending ? "Finding..." : "Find"}
+                    </button>
+                  </div>
+                </form>
                 <label className="space-y-2 text-sm text-[var(--text-muted)]">
                   <span>State</span>
                   <select
@@ -296,10 +348,16 @@ export default function UrbexDbPage() {
               <UrbexMap
                 locations={filteredLocations}
                 onSelectSubmissionPoint={onSelectSubmissionPoint}
+                searchPoint={mapSearchPoint}
                 onOpenStreetView={(point) => {
                   setStreetViewTarget(point);
                 }}
               />
+              {mapSearchMessage ? (
+                <p className="mt-4 rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--text-muted)]">
+                  {mapSearchMessage}
+                </p>
+              ) : null}
               {mapSelectionMessage ? (
                 <p className="mt-4 rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--text-muted)]">
                   {mapSelectionMessage}
