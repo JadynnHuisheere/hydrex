@@ -532,25 +532,25 @@ export default function UrbexDbPage() {
               }}
             >
               <div className="flex flex-wrap items-center justify-between gap-3 pb-5">
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-3">
                   <button
                     type="button"
                     draggable
                     onDragStart={() => {
                       setDraggingPanel("map");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    Drag
+                    ≡
                   </button>
                   <div>
-                    <p className="eyebrow">Map system</p>
-                    <p className="mt-2 text-xl font-semibold">Search addresses and explore pin regions by zoom</p>
+                    <p className="text-lg font-semibold">🗺️ Map</p>
+                    <p className="text-sm text-[var(--text-muted)]">Search & explore approved locations</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                    <span>Map size</span>
+                    <span>Size</span>
                     <input
                       type="range"
                       min={320}
@@ -560,9 +560,12 @@ export default function UrbexDbPage() {
                       onChange={(event) => {
                         setMapHeight(Number(event.target.value));
                       }}
+                      className="w-20"
                     />
                   </label>
-                  <p className="text-sm text-[var(--text-muted)]">{filteredLocations.length} of {approvedLocations.length} approved locations</p>
+                  <p className="rounded-full bg-[var(--olive)]/10 px-3 py-1 text-xs font-semibold text-[var(--olive)] whitespace-nowrap">
+                    {filteredLocations.length}/{approvedLocations.length}
+                  </p>
                 </div>
               </div>
               <div className="grid gap-4 pb-5 md:grid-cols-[1.3fr_0.7fr]">
@@ -646,34 +649,34 @@ export default function UrbexDbPage() {
               }}
             >
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-3">
                   <button
                     type="button"
                     draggable
                     onDragStart={() => {
                       setDraggingPanel("submission");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    Drag
+                    ≡
                   </button>
                   <div>
-                    <p className="eyebrow">Submit a location</p>
-                    <p className="mt-2 text-xl font-semibold">Send new spots into the moderation queue</p>
+                    <p className="text-lg font-semibold">📤 Submit</p>
+                    <p className="text-sm text-[var(--text-muted)]">Share new spots for review</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                    Urbex access enabled
+                  <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-semibold text-[var(--accent)]">
+                    Urbex access
                   </span>
                   <button
                     type="button"
                     onClick={() => {
                       setShowSubmission((current) => !current);
                     }}
-                    className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold"
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
                   >
-                    {showSubmission ? "Hide" : "Show"}
+                    {showSubmission ? "−" : "+"}
                   </button>
                 </div>
               </div>
@@ -882,48 +885,51 @@ export default function UrbexDbPage() {
                 }}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       draggable
                       onDragStart={() => {
                         setDraggingPanel("moderator");
                       }}
-                      className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                      className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                     >
-                      Drag
+                      ≡
                     </button>
-                    <p className="eyebrow">Moderator menu</p>
+                    <div>
+                      <p className="text-lg font-semibold">🛡️ Moderator</p>
+                      <p className="text-xs text-[var(--text-muted)]">Review & manage submissions</p>
+                    </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
                       setShowModeratorMenu((current) => !current);
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
                   >
-                    {showModeratorMenu ? "Hide" : "Show"}
+                    {showModeratorMenu ? "−" : "+"}
                   </button>
                 </div>
                 {showModeratorMenu ? (
                   <>
-                    <div className="mt-5 grid gap-4 md:grid-cols-3">
-                      <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                        <p className="text-xs uppercase tracking-[0.18em]">Pending queue</p>
-                        <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{pendingSubmissions.length}</p>
+                    <div className="mt-6 space-y-3">
+                      <div className="rounded-[20px] bg-white/80 p-5 border border-[var(--line)]">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Pending</p>
+                        <p className="mt-3 text-3xl font-bold text-[var(--accent)]">{pendingSubmissions.length}</p>
                       </div>
-                      <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                        <p className="text-xs uppercase tracking-[0.18em]">Approved pins</p>
-                        <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{approvedLocations.length}</p>
+                      <div className="rounded-[20px] bg-white/80 p-5 border border-[var(--line)]">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Approved</p>
+                        <p className="mt-3 text-3xl font-bold text-[var(--olive)]">{approvedLocations.length}</p>
                       </div>
-                      <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                        <p className="text-xs uppercase tracking-[0.18em]">Role</p>
-                        <p className="mt-2 text-2xl font-semibold text-[var(--text)]">{profile?.role ?? "base"}</p>
+                      <div className="rounded-[20px] bg-white/80 p-5 border border-[var(--line)]">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Your role</p>
+                        <p className="mt-3 text-lg font-semibold capitalize">{profile?.role ?? "base"}</p>
                       </div>
                     </div>
 
                     {moderationMessage ? (
-                      <div className="mt-5 rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                      <div className="mt-6 rounded-[20px] bg-white/80 p-4 text-sm text-[var(--text-muted)] border border-[var(--line)]">
                         {moderationMessage}
                       </div>
                     ) : null}
@@ -943,48 +949,51 @@ export default function UrbexDbPage() {
               }}
             >
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
                     draggable
                     onDragStart={() => {
                       setDraggingPanel("approved");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    Drag
+                    ≡
                   </button>
-                  <p className="eyebrow">Approved locations</p>
+                  <div>
+                    <p className="text-lg font-semibold">📍 Locations</p>
+                    <p className="text-xs text-[var(--text-muted)]">Approved spots on the map</p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     setShowApprovedLocations((current) => !current);
                   }}
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
                 >
-                  {showApprovedLocations ? "Hide" : "Show"}
+                  {showApprovedLocations ? "−" : "+"}
                 </button>
               </div>
               {showApprovedLocations ? (
-              <div className="mt-5 space-y-3">
+              <div className="mt-6 space-y-3">
                 {filteredLocations.map((location) => (
-                  <div key={location.id} className="rounded-[24px] bg-white/80 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-base font-semibold">{location.title}</p>
-                      <span className="text-sm text-[var(--olive)]">+{location.points} pts</span>
+                  <div key={location.id} className="rounded-[20px] bg-white/80 p-4 border border-[var(--line)] hover:border-[var(--accent)] transition">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-base leading-tight">{location.title}</p>
+                        <p className="mt-2 text-sm text-[var(--text-muted)] line-clamp-2">{location.description}</p>
+                      </div>
+                      <span className="rounded-full bg-[var(--olive)]/10 px-3 py-1 text-xs font-semibold text-[var(--olive)] whitespace-nowrap">+{location.points}</span>
                     </div>
-                    <p className="mt-2 text-sm text-[var(--text-muted)]">{location.description}</p>
-                    <p className="mt-3 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                      {location.region} • {location.state} • {location.address}
-                    </p>
-                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                      Submitted by {location.submittedBy}
-                    </p>
+                    <div className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
+                      <p>📍 {location.region} • {location.state} • {location.address}</p>
+                      <p>👤 {location.submittedBy}</p>
+                    </div>
                   </div>
                 ))}
                 {filteredLocations.length === 0 ? (
-                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                  <div className="rounded-[20px] bg-white/80 p-4 text-sm text-[var(--text-muted)] border border-[var(--line)]">
                     No approved locations match that area search yet.
                   </div>
                 ) : null}
@@ -1005,62 +1014,63 @@ export default function UrbexDbPage() {
               }}
             >
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
                     draggable
                     onDragStart={() => {
                       setDraggingPanel("queue");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    Drag
+                    ≡
                   </button>
-                  <p className="eyebrow">Moderation queue</p>
+                  <div>
+                    <p className="text-lg font-semibold">⏳ Queue</p>
+                    <p className="text-xs text-[var(--text-muted)]">Submissions awaiting review</p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     setShowQueue((current) => !current);
                   }}
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
                 >
-                  {showQueue ? "Hide" : "Show"}
+                  {showQueue ? "−" : "+"}
                 </button>
               </div>
               {showQueue ? (
-              <div className="mt-5 space-y-3">
+              <div className="mt-6 space-y-3">
                 {pendingSubmissions.length === 0 ? (
-                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                    No pending submissions.
+                  <div className="rounded-[20px] bg-white/80 p-4 text-sm text-[var(--text-muted)] border border-[var(--line)]">
+                    ✓ No pending submissions.
                   </div>
                 ) : null}
 
                 {pendingSubmissions.map((submission) => (
-                  <div key={submission.id} className="rounded-[24px] bg-white/80 p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <p className="text-base font-semibold">{submission.title}</p>
-                      <span className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                        {submission.images} images
-                      </span>
+                  <div key={submission.id} className="rounded-[20px] bg-white/80 p-4 border border-[var(--line)] hover:border-[var(--accent)] transition">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-base">{submission.title}</p>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">{submission.note}</p>
+                      </div>
+                      <span className="rounded-full bg-[var(--accent)]/10 px-2 py-1 text-xs font-semibold text-[var(--accent)] whitespace-nowrap">{submission.images}🖼</span>
                     </div>
-                    <p className="mt-2 text-sm text-[var(--text-muted)]">{submission.note}</p>
-                    <p className="mt-3 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                      {submission.region} • {submission.state} • {submission.address}
-                    </p>
-                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                      {submission.submittedBy} • {submission.createdAt}
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-3">
+                    <div className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
+                      <p>📍 {submission.region} • {submission.state}</p>
+                      <p>👤 {submission.submittedBy} • {submission.createdAt}</p>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
                       <button
                         type="button"
                         disabled={reviewingId === submission.id}
                         onClick={() => {
                           void onReview(submission.id, "approved");
                         }}
-                        className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {reviewingId === submission.id ? "Working..." : `Approve (+${submission.points})`}
+                        {reviewingId === submission.id ? "…" : `✓ +${submission.points}`}
                       </button>
                       <button
                         type="button"
@@ -1068,9 +1078,9 @@ export default function UrbexDbPage() {
                         onClick={() => {
                           void onReview(submission.id, "rejected");
                         }}
-                        className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60 hover:bg-white/50 transition"
                       >
-                        Decline
+                        ✕ Decline
                       </button>
                     </div>
                   </div>
@@ -1092,41 +1102,49 @@ export default function UrbexDbPage() {
               }}
             >
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
                     draggable
                     onDragStart={() => {
                       setDraggingPanel("leaderboard");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    Drag
+                    ≡
                   </button>
-                  <p className="eyebrow">Leaderboard top 50</p>
+                  <div>
+                    <p className="text-lg font-semibold">🏆 Rankings</p>
+                    <p className="text-xs text-[var(--text-muted)]">Top 50 contributors</p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     setShowLeaderboard((current) => !current);
                   }}
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
                 >
-                  {showLeaderboard ? "Hide" : "Show"}
+                  {showLeaderboard ? "−" : "+"}
                 </button>
               </div>
               {showLeaderboard ? (
-              <div className="mt-5 space-y-3">
+              <div className="mt-6 space-y-2">
                 {leaderboardTop.length === 0 ? (
-                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                  <div className="rounded-[20px] bg-white/80 p-4 text-sm text-[var(--text-muted)] border border-[var(--line)]">
                     No ranked users yet.
                   </div>
                 ) : null}
 
                 {leaderboardTop.map((entry) => (
-                  <div key={entry.rank} className="flex items-center justify-between rounded-[24px] bg-white/80 px-4 py-3 text-sm">
-                    <span className="font-semibold">#{entry.rank} {entry.name}</span>
-                    <span className="text-[var(--text-muted)]">{entry.score} pts</span>
+                  <div key={entry.rank} className="flex items-center justify-between rounded-[20px] bg-white/80 px-4 py-3 text-sm border border-[var(--line)] hover:border-[var(--accent)] transition">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--accent)] text-xs font-bold text-white">
+                        {entry.rank}
+                      </span>
+                      <span className="font-semibold">{entry.name}</span>
+                    </div>
+                    <span className="font-semibold text-[var(--accent)]">{entry.score}</span>
                   </div>
                 ))}
               </div>
