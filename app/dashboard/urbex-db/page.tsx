@@ -67,6 +67,8 @@ export default function UrbexDbPage() {
   const [mapSearchMessage, setMapSearchMessage] = useState<string | null>(null);
   const [mapSearchPoint, setMapSearchPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const [selectedState, setSelectedState] = useState("all");
+  const [showHeroHeader, setShowHeroHeader] = useState(true);
+  const [mapHeight, setMapHeight] = useState(440);
   const [regionValue, setRegionValue] = useState("");
   const [stateValue, setStateValue] = useState("");
   const [addressValue, setAddressValue] = useState("");
@@ -185,6 +187,23 @@ export default function UrbexDbPage() {
       void refreshPanels();
     }
   }, [hasUrbexAccess, loading, router, user]);
+
+  useEffect(() => {
+    if (!user || !hasUrbexAccess) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void refreshPanels();
+      if (selectedPin) {
+        void openPinForum(selectedPin);
+      }
+    }, 10000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [hasUrbexAccess, selectedPin, user]);
 
   async function onReview(submissionId: string, decision: "approved" | "rejected") {
     if (!user) {
@@ -427,20 +446,43 @@ export default function UrbexDbPage() {
   return (
     <main className="app-shell">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
-        <section className="panel-strong rounded-[32px] px-6 py-8 sm:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="eyebrow">Urbex DB</p>
-              <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
-                Approved locations, submission flow, and moderation context in one shell
-              </h1>
-            </div>
+        {showHeroHeader ? (
+          <section className="panel-strong rounded-[32px] px-6 py-8 sm:px-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="eyebrow">Urbex DB</p>
+                <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
+                  Approved locations, submission flow, and moderation context in one shell
+                </h1>
+              </div>
 
-            <div className="rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-              Licensed access active
+              <div className="flex items-center gap-2">
+                <div className="rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                  Licensed access active
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowHeroHeader(false);
+                  }}
+                  className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold"
+                >
+                  Close header
+                </button>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setShowHeroHeader(true);
+            }}
+            className="self-start rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold"
+          >
+            Show header
+          </button>
+        )}
 
         <section className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
           <div className="space-y-6">
@@ -448,9 +490,24 @@ export default function UrbexDbPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 pb-5">
                 <div>
                   <p className="eyebrow">Map system</p>
-                  <p className="mt-2 text-xl font-semibold">Search approved pins by state, address, or region</p>
+                  <p className="mt-2 text-xl font-semibold">Search addresses and explore pin regions by zoom</p>
                 </div>
-                <p className="text-sm text-[var(--text-muted)]">{filteredLocations.length} of {approvedLocations.length} approved locations</p>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <span>Map size</span>
+                    <input
+                      type="range"
+                      min={320}
+                      max={760}
+                      step={20}
+                      value={mapHeight}
+                      onChange={(event) => {
+                        setMapHeight(Number(event.target.value));
+                      }}
+                    />
+                  </label>
+                  <p className="text-sm text-[var(--text-muted)]">{filteredLocations.length} of {approvedLocations.length} approved locations</p>
+                </div>
               </div>
               <div className="grid gap-4 pb-5 md:grid-cols-[1.3fr_0.7fr]">
                 <form
@@ -499,6 +556,7 @@ export default function UrbexDbPage() {
               </div>
               <UrbexMap
                 locations={filteredLocations}
+                height={mapHeight}
                 onSelectSubmissionPoint={onSelectSubmissionPoint}
                 searchPoint={mapSearchPoint}
                 clearTempPinToken={clearTempPinToken}
@@ -814,6 +872,7 @@ export default function UrbexDbPage() {
               ) : null}
             </section>
 
+            {canModerate ? (
             <section id="queue" className="panel rounded-[32px] p-6">
               <div className="flex items-center justify-between gap-3">
                 <p className="eyebrow">Moderation queue</p>
@@ -829,19 +888,13 @@ export default function UrbexDbPage() {
               </div>
               {showQueue ? (
               <div className="mt-5 space-y-3">
-                {!canModerate ? (
-                  <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
-                    Moderator queue is visible only to admins.
-                  </div>
-                ) : null}
-
-                {canModerate && pendingSubmissions.length === 0 ? (
+                {pendingSubmissions.length === 0 ? (
                   <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
                     No pending submissions.
                   </div>
                 ) : null}
 
-                {canModerate && pendingSubmissions.map((submission) => (
+                {pendingSubmissions.map((submission) => (
                   <div key={submission.id} className="rounded-[24px] bg-white/80 p-4">
                     <div className="flex items-center justify-between gap-4">
                       <p className="text-base font-semibold">{submission.title}</p>
@@ -883,6 +936,7 @@ export default function UrbexDbPage() {
               </div>
               ) : null}
             </section>
+            ) : null}
 
             <section id="leaderboard" className="panel rounded-[32px] p-6">
               <div className="flex items-center justify-between gap-3">
@@ -954,7 +1008,7 @@ export default function UrbexDbPage() {
       ) : null}
 
       {selectedPin ? (
-        <div className="fixed inset-y-0 right-0 z-[9997] w-full max-w-md border-l border-[var(--line)] bg-[var(--background-strong)] p-4 shadow-2xl">
+        <div className="fixed right-0 bottom-0 top-16 z-[9997] w-full max-w-md border-l border-[var(--line)] bg-[var(--background-strong)] p-4 shadow-2xl">
           <div className="panel-strong flex h-full flex-col rounded-[24px] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>

@@ -28,6 +28,7 @@ type LocationPin = {
 
 type UrbexMapProps = {
   locations: LocationPin[];
+  height?: number;
   onSelectSubmissionPoint?: (point: { lat: number; lng: number }) => void;
   onOpenStreetView?: (point: { lat: number; lng: number; title: string }) => void;
   onOpenPinForum?: (pin: LocationPin) => void;
@@ -53,30 +54,12 @@ type DisplayPin = {
   sampleTitles: string[];
 };
 
-function getClusterGridSize(zoom: number) {
-  if (zoom <= 5) {
-    return 2.2;
-  }
-
-  if (zoom <= 7) {
-    return 1.2;
-  }
-
-  if (zoom <= 9) {
-    return 0.55;
-  }
-
-  if (zoom <= 11) {
-    return 0.2;
-  }
-
-  return 0;
-}
-
 function clusterLocations(locations: LocationPin[], zoom: number) {
-  const gridSize = getClusterGridSize(zoom);
+  if (zoom < 3) {
+    return [] as DisplayPin[];
+  }
 
-  if (gridSize === 0) {
+  if (zoom >= 6) {
     return locations.map<DisplayPin>((location) => ({
       id: location.id,
       lat: location.lat,
@@ -99,9 +82,7 @@ function clusterLocations(locations: LocationPin[], zoom: number) {
   const grouped = new Map<string, { items: LocationPin[]; lat: number; lng: number }>();
 
   for (const location of locations) {
-    const latKey = Math.round(location.lat / gridSize);
-    const lngKey = Math.round(location.lng / gridSize);
-    const key = `${latKey}:${lngKey}`;
+    const key = location.state.trim().toLowerCase() || "unknown";
     const current = grouped.get(key);
 
     if (!current) {
@@ -118,40 +99,20 @@ function clusterLocations(locations: LocationPin[], zoom: number) {
     const first = cluster.items[0];
     const count = cluster.items.length;
 
-    if (count === 1) {
-      return {
-        id: first.id,
-        lat: first.lat,
-        lng: first.lng,
-        count: 1,
-        isCluster: false,
-        title: first.title,
-        region: first.region,
-        state: first.state,
-        address: first.address,
-        images: first.images,
-        imageUrls: first.imageUrls,
-        media: first.media,
-        description: first.description,
-        submittedBy: first.submittedBy,
-        sampleTitles: [first.title]
-      } satisfies DisplayPin;
-    }
-
     return {
       id: key,
       lat: cluster.lat / count,
       lng: cluster.lng / count,
       count,
       isCluster: true,
-      title: `${count} nearby locations`,
+      title: `${first.state || "Unknown"} (${count})`,
       region: first.region,
       state: first.state,
       address: first.address,
       images: cluster.items.reduce((total, item) => total + item.images, 0),
       imageUrls: [],
       media: [],
-      description: "Zoom in to split this cluster into individual locations.",
+      description: "Zoom in further to show all pins for this area.",
       submittedBy: "multiple explorers",
       sampleTitles: cluster.items.slice(0, 5).map((item) => item.title)
     } satisfies DisplayPin;
@@ -253,7 +214,7 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
             fillOpacity: 0.85,
             weight: 2
           }}
-          radius={pin.isCluster ? Math.min(24, 10 + pin.count) : 9}
+          radius={pin.isCluster ? 14 : 9}
         >
           <Popup>
             <div className="space-y-2">
@@ -344,17 +305,15 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
                   Open pin forum
                 </button>
               ) : null}
-              {!pin.isCluster ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenStreetView?.({ lat: pin.lat, lng: pin.lng, title: pin.title });
-                  }}
-                  className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold"
-                >
-                  Open Street View
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenStreetView?.({ lat: pin.lat, lng: pin.lng, title: pin.title });
+                }}
+                className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold"
+              >
+                Open Street View
+              </button>
             </div>
           </Popup>
         </CircleMarker>
@@ -418,6 +377,15 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                 {searchPoint.lat.toFixed(6)}, {searchPoint.lng.toFixed(6)}
               </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenStreetView?.({ lat: searchPoint.lat, lng: searchPoint.lng, title: "Address result" });
+                }}
+                className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold"
+              >
+                Open Street View
+              </button>
             </div>
           </Popup>
         </CircleMarker>
@@ -426,13 +394,13 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
   );
 }
 
-export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, clearTempPinToken, searchPoint }: UrbexMapProps) {
+export function UrbexMap({ locations, height = 440, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, clearTempPinToken, searchPoint }: UrbexMapProps) {
   const center = locations[0]
     ? ([locations[0].lat, locations[0].lng] as [number, number])
     : ([39.8283, -98.5795] as [number, number]);
 
   return (
-    <div className="map-frame h-[440px] overflow-hidden rounded-[24px] border border-[var(--line)]">
+    <div className="map-frame overflow-hidden rounded-[24px] border border-[var(--line)]" style={{ height }}>
       <MapContainer center={center} zoom={5} scrollWheelZoom className="h-full w-full">
         <MapSearchFocus searchPoint={searchPoint} />
         <TileLayer
