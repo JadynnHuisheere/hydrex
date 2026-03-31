@@ -741,6 +741,11 @@ export async function reviewSubmission(
 
       if (decision === "approved") {
         const awardedPoints = Math.max(0, Number(submissionData.points ?? 25));
+        const submitterUid = typeof submissionData.submittedByUid === "string"
+          ? submissionData.submittedByUid
+          : null;
+        const submitterRef = submitterUid ? firestore.doc(db, "users", submitterUid) : null;
+        const submitterSnap = submitterRef ? await tx.get(submitterRef) : null;
 
         tx.update(submissionRef, {
           ...commonUpdate,
@@ -749,18 +754,13 @@ export async function reviewSubmission(
           note: "Approved by moderation."
         });
 
-        if (typeof submissionData.submittedByUid === "string") {
-          const submitterRef = firestore.doc(db, "users", submissionData.submittedByUid);
-          const submitterSnap = await tx.get(submitterRef);
-
-          if (submitterSnap.exists()) {
-            const submitterData = submitterSnap.data() as Record<string, unknown>;
-            tx.update(submitterRef, {
-              score: Number(submitterData.score ?? 0) + awardedPoints,
-              approvedSubmissions: Number(submitterData.approvedSubmissions ?? 0) + 1,
-              updatedAt: firestore.serverTimestamp()
-            });
-          }
+        if (submitterRef && submitterSnap?.exists()) {
+          const submitterData = submitterSnap.data() as Record<string, unknown>;
+          tx.update(submitterRef, {
+            score: Number(submitterData.score ?? 0) + awardedPoints,
+            approvedSubmissions: Number(submitterData.approvedSubmissions ?? 0) + 1,
+            updatedAt: firestore.serverTimestamp()
+          });
         }
 
         return;

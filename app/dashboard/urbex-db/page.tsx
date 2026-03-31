@@ -92,7 +92,17 @@ export default function UrbexDbPage() {
     const result = await reviewSubmission(user.uid, submissionId, decision);
 
     if (!result.ok) {
-      setModerationMessage("Could not update that submission right now.");
+      const reasonMessage: Record<string, string> = {
+        "not-moderator": "Your account is missing moderator permissions.",
+        "submission-not-found": "This submission no longer exists.",
+        "already-reviewed": "This submission was already reviewed.",
+        "user-not-found": "Your user record was not found.",
+        "permission-denied": "Firestore denied this action. Check rules for moderator updates."
+      };
+
+      setModerationMessage(
+        reasonMessage[result.reason] ?? "Could not update that submission right now."
+      );
       setReviewingId(null);
       return;
     }
