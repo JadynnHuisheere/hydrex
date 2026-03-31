@@ -609,29 +609,44 @@ export default function UrbexDbPage() {
     <main className="app-shell">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         {showHeroHeader ? (
-          <section className="panel-strong rounded-[32px] px-6 py-8 sm:px-8">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="eyebrow">Urbex DB</p>
-                <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">
-                  Approved locations, submission flow, and moderation context in one shell
+          <section className="panel-strong rounded-[18px] px-5 py-6 sm:px-6">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="eyebrow">Urbex database</p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">
+                  Operational map, review queue, and field notes.
                 </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-muted)]">
+                  Built for scanning locations quickly, validating submissions, and moving through the map without decorative noise.
+                </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                  Licensed access active
+              <div className="grid grid-cols-2 gap-2 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)] sm:grid-cols-3 lg:min-w-[320px]">
+                <div className="rounded-[12px] border border-[var(--line)] bg-white/70 px-3 py-3">
+                  <p>Records</p>
+                  <p className="mt-2 text-lg font-semibold text-[var(--text)]">{approvedLocations.length}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowHeroHeader(false);
-                  }}
-                  className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold"
-                >
-                  Close header
-                </button>
+                <div className="rounded-[12px] border border-[var(--line)] bg-white/70 px-3 py-3">
+                  <p>Queue</p>
+                  <p className="mt-2 text-lg font-semibold text-[var(--text)]">{pendingSubmissions.length}</p>
+                </div>
+                <div className="rounded-[12px] border border-[var(--line)] bg-white/70 px-3 py-3 col-span-2 sm:col-span-1">
+                  <p>Access</p>
+                  <p className="mt-2 text-lg font-semibold text-[var(--text)]">Live</p>
+                </div>
               </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowHeroHeader(false);
+                }}
+                className="rounded-[10px] border border-[var(--line)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]"
+              >
+                Hide panel
+              </button>
             </div>
           </section>
         ) : (
@@ -640,16 +655,16 @@ export default function UrbexDbPage() {
             onClick={() => {
               setShowHeroHeader(true);
             }}
-            className="self-start rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold"
+            className="self-start rounded-[10px] border border-[var(--line)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em]"
           >
-            Show header
+            Show panel
           </button>
         )}
 
         <section className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
           <div className="flex flex-col gap-6">
             <article
-              className="panel rounded-[32px] p-4 sm:p-6"
+              className="panel rounded-[18px] p-4 sm:p-6"
               style={{ order: panelOrder.map }}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -666,13 +681,13 @@ export default function UrbexDbPage() {
                     onDragStart={() => {
                       setDraggingPanel("map");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
+                    className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    ≡
+                    Move
                   </button>
                   <div>
-                    <p className="text-lg font-semibold">🗺️ Map</p>
-                    <p className="text-sm text-[var(--text-muted)]">Search & explore approved locations</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Section 01</p>
+                    <p className="mt-1 text-lg font-semibold">Map</p>
                   </div>
                 </div>
                 <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
@@ -690,8 +705,8 @@ export default function UrbexDbPage() {
                       className="w-20"
                     />
                   </label>
-                  <p className="rounded-full bg-[var(--olive)]/10 px-3 py-1 text-xs font-semibold text-[var(--olive)] whitespace-nowrap">
-                    {filteredLocations.length}/{approvedLocations.length}
+                  <p className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold text-[var(--text-muted)] whitespace-nowrap">
+                    {filteredLocations.length} shown
                   </p>
                 </div>
               </div>
@@ -710,13 +725,13 @@ export default function UrbexDbPage() {
                       onChange={(event) => {
                         setMapSearchTerm(event.target.value);
                       }}
-                      placeholder="Search like Google Maps (street, city, state)"
-                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                      placeholder="Search address, city, or coordinates"
+                      className="w-full rounded-[12px] border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                     />
                     <button
                       type="submit"
                       disabled={mapSearchPending}
-                      className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-[10px] bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {mapSearchPending ? "Finding..." : "Find"}
                     </button>
@@ -729,7 +744,7 @@ export default function UrbexDbPage() {
                     onChange={(event) => {
                       setSelectedState(event.target.value);
                     }}
-                    className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    className="w-full rounded-[12px] border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                   >
                     <option value="all">All states</option>
                     {availableStates.map((state) => (
@@ -740,8 +755,11 @@ export default function UrbexDbPage() {
                   </select>
                 </label>
               </div>
-              <div className="mb-5 rounded-2xl border border-[var(--line)] bg-white/75 p-4">
-                <p className="text-sm font-semibold">Map options</p>
+              <div className="mb-5 rounded-[14px] border border-[var(--line)] bg-white/75 p-4">
+                <div className="flex items-baseline justify-between gap-3 border-b border-[var(--line)] pb-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Map options</p>
+                  <p className="text-xs text-[var(--text-muted)]">Layers and filters</p>
+                </div>
                 <div className="mt-3 grid gap-2 text-xs text-[var(--text-muted)] sm:grid-cols-2">
                   <label className="flex items-center gap-2">
                     <input
@@ -872,7 +890,7 @@ export default function UrbexDbPage() {
             </article>
 
             <article
-              className="panel rounded-[32px] p-4 sm:p-6"
+              className="panel rounded-[18px] p-4 sm:p-6"
               style={{ order: panelOrder.submission }}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -889,27 +907,27 @@ export default function UrbexDbPage() {
                     onDragStart={() => {
                       setDraggingPanel("submission");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
+                    className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    ≡
+                    Move
                   </button>
                   <div>
-                    <p className="text-lg font-semibold">📤 Submit</p>
-                    <p className="text-sm text-[var(--text-muted)]">Share new spots for review</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Section 02</p>
+                    <p className="mt-1 text-lg font-semibold">Submit record</p>
                   </div>
                 </div>
                 <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
-                  <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-semibold text-[var(--accent)]">
-                    Urbex access
+                  <span className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.12em]">
+                    Access active
                   </span>
                   <button
                     type="button"
                     onClick={() => {
                       setShowSubmission((current) => !current);
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
+                    className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    {showSubmission ? "−" : "+"}
+                    {showSubmission ? "Hide" : "Show"}
                   </button>
                 </div>
               </div>
@@ -1095,7 +1113,7 @@ export default function UrbexDbPage() {
                 <button
                   type="submit"
                   disabled={submissionPending}
-                  className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-[10px] bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submissionPending ? "Submitting..." : "Submit to moderation"}
                 </button>
@@ -1108,7 +1126,7 @@ export default function UrbexDbPage() {
           <div className="flex flex-col gap-6">
             {canModerate ? (
               <section
-                className="panel rounded-[32px] p-4 sm:p-6"
+                className="panel rounded-[18px] p-4 sm:p-6"
                 style={{ order: panelOrder.moderator }}
                 onDragOver={(event) => {
                   event.preventDefault();
@@ -1125,13 +1143,13 @@ export default function UrbexDbPage() {
                       onDragStart={() => {
                         setDraggingPanel("moderator");
                       }}
-                      className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
+                      className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                     >
-                      ≡
+                      Move
                     </button>
                     <div>
-                      <p className="text-lg font-semibold">🛡️ Moderator</p>
-                      <p className="text-xs text-[var(--text-muted)]">Review & manage submissions</p>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Section 03</p>
+                      <p className="mt-1 text-lg font-semibold">Moderation</p>
                     </div>
                   </div>
                   <button
@@ -1139,9 +1157,9 @@ export default function UrbexDbPage() {
                     onClick={() => {
                       setShowModeratorMenu((current) => !current);
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
+                    className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    {showModeratorMenu ? "−" : "+"}
+                    {showModeratorMenu ? "Hide" : "Show"}
                   </button>
                 </div>
                 {showModeratorMenu ? (
@@ -1172,7 +1190,7 @@ export default function UrbexDbPage() {
             ) : null}
 
             <section
-              className="panel rounded-[32px] p-4 sm:p-6"
+              className="panel rounded-[18px] p-4 sm:p-6"
               style={{ order: panelOrder.approved }}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -1189,13 +1207,13 @@ export default function UrbexDbPage() {
                     onDragStart={() => {
                       setDraggingPanel("approved");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
+                    className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    ≡
+                    Move
                   </button>
                   <div>
-                    <p className="text-lg font-semibold">📍 Locations</p>
-                    <p className="text-xs text-[var(--text-muted)]">Approved spots on the map</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Section 04</p>
+                    <p className="mt-1 text-lg font-semibold">Approved records</p>
                   </div>
                 </div>
                 <button
@@ -1203,25 +1221,26 @@ export default function UrbexDbPage() {
                   onClick={() => {
                     setShowApprovedLocations((current) => !current);
                   }}
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
+                  className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                 >
-                  {showApprovedLocations ? "−" : "+"}
+                  {showApprovedLocations ? "Hide" : "Show"}
                 </button>
               </div>
               {showApprovedLocations ? (
               <div className="mt-6 max-h-[24rem] space-y-3 overflow-y-auto pr-1">
                 {filteredLocations.map((location) => (
-                  <div key={location.id} className="rounded-[20px] bg-white/80 p-4 border border-[var(--line)] hover:border-[var(--accent)] transition">
+                  <div key={location.id} className="rounded-[12px] bg-white/80 p-4 border border-[var(--line)] hover:border-[var(--accent)] transition">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-base leading-tight">{location.title}</p>
                         <p className="mt-2 text-sm text-[var(--text-muted)] line-clamp-2">{location.description}</p>
                       </div>
-                      <span className="rounded-full bg-[var(--olive)]/10 px-3 py-1 text-xs font-semibold text-[var(--olive)] whitespace-nowrap">+{location.points}</span>
+                      <span className="rounded-[10px] border border-[var(--line)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)] whitespace-nowrap">{location.points} pts</span>
                     </div>
-                    <div className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
-                      <p>📍 {location.region} • {location.state} • {location.address}</p>
-                      <p>👤 {location.submittedBy}</p>
+                    <div className="mt-3 space-y-1 text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                      <p>{location.region} • {location.state}</p>
+                      <p>{location.address}</p>
+                      <p>{location.submittedBy}</p>
                     </div>
                     <div className="mt-4 flex justify-end">
                       <button
@@ -1229,9 +1248,9 @@ export default function UrbexDbPage() {
                         onClick={() => {
                           onGoToLocation(location);
                         }}
-                        className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold hover:bg-white/60 transition"
+                        className="rounded-[10px] border border-[var(--line)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] hover:bg-white/60 transition"
                       >
-                        Go to pin
+                        Locate
                       </button>
                     </div>
                   </div>
@@ -1248,7 +1267,7 @@ export default function UrbexDbPage() {
             {canModerate ? (
             <section
               id="queue"
-              className="panel rounded-[32px] p-4 sm:p-6"
+              className="panel rounded-[18px] p-4 sm:p-6"
               style={{ order: panelOrder.queue }}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -1265,13 +1284,13 @@ export default function UrbexDbPage() {
                     onDragStart={() => {
                       setDraggingPanel("queue");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
+                    className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    ≡
+                    Move
                   </button>
                   <div>
-                    <p className="text-lg font-semibold">⏳ Queue</p>
-                    <p className="text-xs text-[var(--text-muted)]">Submissions awaiting review</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Section 05</p>
+                    <p className="mt-1 text-lg font-semibold">Review queue</p>
                   </div>
                 </div>
                 <button
@@ -1279,31 +1298,31 @@ export default function UrbexDbPage() {
                   onClick={() => {
                     setShowQueue((current) => !current);
                   }}
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
+                  className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                 >
-                  {showQueue ? "−" : "+"}
+                  {showQueue ? "Hide" : "Show"}
                 </button>
               </div>
               {showQueue ? (
               <div className="mt-6 space-y-3">
                 {pendingSubmissions.length === 0 ? (
-                  <div className="rounded-[20px] bg-white/80 p-4 text-sm text-[var(--text-muted)] border border-[var(--line)]">
-                    ✓ No pending submissions.
+                  <div className="rounded-[12px] bg-white/80 p-4 text-sm text-[var(--text-muted)] border border-[var(--line)]">
+                    No pending submissions.
                   </div>
                 ) : null}
 
                 {pendingSubmissions.map((submission) => (
-                  <div key={submission.id} className="rounded-[20px] bg-white/80 p-4 border border-[var(--line)] hover:border-[var(--accent)] transition">
+                  <div key={submission.id} className="rounded-[12px] bg-white/80 p-4 border border-[var(--line)] hover:border-[var(--accent)] transition">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-base">{submission.title}</p>
                         <p className="mt-1 text-xs text-[var(--text-muted)]">{submission.note}</p>
                       </div>
-                      <span className="rounded-full bg-[var(--accent)]/10 px-2 py-1 text-xs font-semibold text-[var(--accent)] whitespace-nowrap">{submission.images}🖼</span>
+                      <span className="rounded-[10px] border border-[var(--line)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)] whitespace-nowrap">{submission.images} files</span>
                     </div>
-                    <div className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
-                      <p>📍 {submission.region} • {submission.state}</p>
-                      <p>👤 {submission.submittedBy} • {submission.createdAt}</p>
+                    <div className="mt-3 space-y-1 text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                      <p>{submission.region} • {submission.state}</p>
+                      <p>{submission.submittedBy} • {submission.createdAt}</p>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button
@@ -1312,9 +1331,9 @@ export default function UrbexDbPage() {
                         onClick={() => {
                           void onReview(submission.id, "approved");
                         }}
-                        className="rounded-full bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-[10px] bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {reviewingId === submission.id ? "…" : `✓ +${submission.points}`}
+                        {reviewingId === submission.id ? "Working" : `Approve +${submission.points}`}
                       </button>
                       <button
                         type="button"
@@ -1322,9 +1341,9 @@ export default function UrbexDbPage() {
                         onClick={() => {
                           void onReview(submission.id, "rejected");
                         }}
-                        className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60 hover:bg-white/50 transition"
+                        className="rounded-[10px] border border-[var(--line)] px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60 hover:bg-white/50 transition"
                       >
-                        ✕ Decline
+                        Reject
                       </button>
                     </div>
                   </div>
@@ -1336,7 +1355,7 @@ export default function UrbexDbPage() {
 
             <section
               id="leaderboard"
-              className="panel rounded-[32px] p-4 sm:p-6"
+              className="panel rounded-[18px] p-4 sm:p-6"
               style={{ order: panelOrder.leaderboard }}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -1353,13 +1372,13 @@ export default function UrbexDbPage() {
                     onDragStart={() => {
                       setDraggingPanel("leaderboard");
                     }}
-                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
+                    className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                   >
-                    ≡
+                    Move
                   </button>
                   <div>
-                    <p className="text-lg font-semibold">🏆 Rankings</p>
-                    <p className="text-xs text-[var(--text-muted)]">Top 50 contributors</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Section 06</p>
+                    <p className="mt-1 text-lg font-semibold">Contributors</p>
                   </div>
                 </div>
                 <button
@@ -1367,9 +1386,9 @@ export default function UrbexDbPage() {
                   onClick={() => {
                     setShowLeaderboard((current) => !current);
                   }}
-                  className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold hover:bg-white/50 transition"
+                  className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] hover:bg-white/50 transition"
                 >
-                  {showLeaderboard ? "−" : "+"}
+                  {showLeaderboard ? "Hide" : "Show"}
                 </button>
               </div>
               {showLeaderboard ? (
@@ -1381,13 +1400,11 @@ export default function UrbexDbPage() {
                 ) : null}
 
                 {leaderboardTop.map((entry) => (
-                  <div key={entry.rank} className="flex items-center justify-between rounded-[20px] bg-white/80 px-4 py-3 text-sm border border-[var(--line)] hover:border-[var(--accent)] transition">
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--accent)] text-xs font-bold text-white">
-                        {entry.rank}
-                      </span>
-                      <span className="font-semibold">{entry.name}</span>
-                    </div>
+                  <div key={entry.rank} className="grid grid-cols-[44px_1fr_auto] items-center gap-3 rounded-[12px] bg-white/80 px-4 py-3 text-sm border border-[var(--line)] hover:border-[var(--accent)] transition">
+                    <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      {String(entry.rank).padStart(2, "0")}
+                    </span>
+                    <span className="font-semibold">{entry.name}</span>
                     <span className="font-semibold text-[var(--accent)]">{entry.score}</span>
                   </div>
                 ))}
@@ -1398,7 +1415,7 @@ export default function UrbexDbPage() {
           ) : null}
         </section>
 
-        <Link href="/dashboard" className="inline-flex rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold">
+        <Link href="/dashboard" className="inline-flex rounded-[10px] border border-[var(--line)] px-4 py-2 text-sm font-semibold uppercase tracking-[0.12em]">
           Back to dashboard
         </Link>
       </div>

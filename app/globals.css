@@ -110,12 +110,14 @@ textarea::placeholder {
   border: 1px solid var(--line);
   background: var(--surface);
   box-shadow: var(--shadow);
+  border-radius: 18px;
 }
 
 .panel-strong {
   border: 1px solid var(--line);
   background: var(--surface-strong);
   box-shadow: var(--shadow);
+  border-radius: 18px;
 }
 
 .eyebrow {
@@ -128,7 +130,14 @@ textarea::placeholder {
 .map-frame .leaflet-container {
   height: 100%;
   width: 100%;
-  border-radius: 24px;
+  border-radius: 18px;
+}
+
+button,
+input,
+select,
+textarea {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
 .leaflet-popup-content-wrapper,
