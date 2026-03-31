@@ -35,6 +35,7 @@ const UrbexMap = dynamic(
 );
 
 type RankedUser = UserProfile & { rank: number };
+type PanelId = "map" | "submission" | "moderator" | "approved" | "queue" | "leaderboard";
 type SelectedPin = {
   id: string;
   title: string;
@@ -88,6 +89,15 @@ export default function UrbexDbPage() {
   const [showApprovedLocations, setShowApprovedLocations] = useState(true);
   const [showQueue, setShowQueue] = useState(true);
   const [showLeaderboard, setShowLeaderboard] = useState(true);
+  const [draggingPanel, setDraggingPanel] = useState<PanelId | null>(null);
+  const [panelOrder, setPanelOrder] = useState<Record<PanelId, number>>({
+    map: 1,
+    submission: 2,
+    moderator: 1,
+    approved: 2,
+    queue: 3,
+    leaderboard: 4
+  });
   const submissionFormRef = useRef<HTMLFormElement | null>(null);
   const submissionTitleInputRef = useRef<HTMLInputElement | null>(null);
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
@@ -131,6 +141,20 @@ export default function UrbexDbPage() {
     const posts = await fetchLocationForumPosts(pin.id);
     setForumPosts(posts);
     setForumPending(false);
+  }
+
+  function onDropPanel(target: PanelId) {
+    if (!draggingPanel || draggingPanel === target) {
+      return;
+    }
+
+    setPanelOrder((current) => ({
+      ...current,
+      [draggingPanel]: current[target],
+      [target]: current[draggingPanel]
+    }));
+
+    setDraggingPanel(null);
   }
 
   async function onCreateForumPost(formData: FormData) {
@@ -244,7 +268,11 @@ export default function UrbexDbPage() {
     setSubmissionPending(true);
     setSubmissionMessage(null);
 
-    const upload = await uploadSubmissionMedia(user.uid, submissionFiles);
+    const fallbackFiles = (formData.getAll("mediaFiles") as File[]).filter((file) => file.size > 0);
+    const selectedFiles = [...submissionFiles, ...fallbackFiles]
+      .filter((file, index, source) => source.findIndex((entry) => entry.name === file.name && entry.size === file.size) === index)
+      .slice(0, 8);
+    const upload = await uploadSubmissionMedia(user.uid, selectedFiles);
 
     if (!upload.ok) {
       setSubmissionMessage("Could not upload media files. Check Firebase Storage rules and try again.");
@@ -485,12 +513,33 @@ export default function UrbexDbPage() {
         )}
 
         <section className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
-          <div className="space-y-6">
-            <article className="panel rounded-[32px] p-4 sm:p-6">
+          <div className="flex flex-col gap-6">
+            <article
+              className="panel rounded-[32px] p-4 sm:p-6"
+              style={{ order: panelOrder.map }}
+              onDragOver={(event) => {
+                event.preventDefault();
+              }}
+              onDrop={() => {
+                onDropPanel("map");
+              }}
+            >
               <div className="flex flex-wrap items-center justify-between gap-3 pb-5">
-                <div>
-                  <p className="eyebrow">Map system</p>
-                  <p className="mt-2 text-xl font-semibold">Search addresses and explore pin regions by zoom</p>
+                <div className="flex items-start gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => {
+                      setDraggingPanel("map");
+                    }}
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                  >
+                    Drag
+                  </button>
+                  <div>
+                    <p className="eyebrow">Map system</p>
+                    <p className="mt-2 text-xl font-semibold">Search addresses and explore pin regions by zoom</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -579,11 +628,32 @@ export default function UrbexDbPage() {
               ) : null}
             </article>
 
-            <article className="panel rounded-[32px] p-6">
+            <article
+              className="panel rounded-[32px] p-6"
+              style={{ order: panelOrder.submission }}
+              onDragOver={(event) => {
+                event.preventDefault();
+              }}
+              onDrop={() => {
+                onDropPanel("submission");
+              }}
+            >
               <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="eyebrow">Submit a location</p>
-                  <p className="mt-2 text-xl font-semibold">Send new spots into the moderation queue</p>
+                <div className="flex items-start gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => {
+                      setDraggingPanel("submission");
+                    }}
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                  >
+                    Drag
+                  </button>
+                  <div>
+                    <p className="eyebrow">Submit a location</p>
+                    <p className="mt-2 text-xl font-semibold">Send new spots into the moderation queue</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
@@ -723,6 +793,7 @@ export default function UrbexDbPage() {
                     </div>
                     <input
                       ref={mediaInputRef}
+                      name="mediaFiles"
                       type="file"
                       accept="image/*,video/*"
                       multiple
@@ -791,11 +862,32 @@ export default function UrbexDbPage() {
           </div>
 
           {!selectedPin ? (
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             {canModerate ? (
-              <section className="panel rounded-[32px] p-6">
+              <section
+                className="panel rounded-[32px] p-6"
+                style={{ order: panelOrder.moderator }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                }}
+                onDrop={() => {
+                  onDropPanel("moderator");
+                }}
+              >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="eyebrow">Moderator menu</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={() => {
+                        setDraggingPanel("moderator");
+                      }}
+                      className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                    >
+                      Drag
+                    </button>
+                    <p className="eyebrow">Moderator menu</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -833,9 +925,30 @@ export default function UrbexDbPage() {
               </section>
             ) : null}
 
-            <section className="panel rounded-[32px] p-6">
+            <section
+              className="panel rounded-[32px] p-6"
+              style={{ order: panelOrder.approved }}
+              onDragOver={(event) => {
+                event.preventDefault();
+              }}
+              onDrop={() => {
+                onDropPanel("approved");
+              }}
+            >
               <div className="flex items-center justify-between gap-3">
-                <p className="eyebrow">Approved locations</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => {
+                      setDraggingPanel("approved");
+                    }}
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                  >
+                    Drag
+                  </button>
+                  <p className="eyebrow">Approved locations</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -873,9 +986,31 @@ export default function UrbexDbPage() {
             </section>
 
             {canModerate ? (
-            <section id="queue" className="panel rounded-[32px] p-6">
+            <section
+              id="queue"
+              className="panel rounded-[32px] p-6"
+              style={{ order: panelOrder.queue }}
+              onDragOver={(event) => {
+                event.preventDefault();
+              }}
+              onDrop={() => {
+                onDropPanel("queue");
+              }}
+            >
               <div className="flex items-center justify-between gap-3">
-                <p className="eyebrow">Moderation queue</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => {
+                      setDraggingPanel("queue");
+                    }}
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                  >
+                    Drag
+                  </button>
+                  <p className="eyebrow">Moderation queue</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -938,9 +1073,31 @@ export default function UrbexDbPage() {
             </section>
             ) : null}
 
-            <section id="leaderboard" className="panel rounded-[32px] p-6">
+            <section
+              id="leaderboard"
+              className="panel rounded-[32px] p-6"
+              style={{ order: panelOrder.leaderboard }}
+              onDragOver={(event) => {
+                event.preventDefault();
+              }}
+              onDrop={() => {
+                onDropPanel("leaderboard");
+              }}
+            >
               <div className="flex items-center justify-between gap-3">
-                <p className="eyebrow">Leaderboard top 50</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={() => {
+                      setDraggingPanel("leaderboard");
+                    }}
+                    className="rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+                  >
+                    Drag
+                  </button>
+                  <p className="eyebrow">Leaderboard top 50</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
