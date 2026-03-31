@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Compass, KeyRound, MapPinned, ShieldCheck, Trophy } from "lucide-react";
+import { KeyRound, MapPinned, ShieldCheck, Trophy } from "lucide-react";
 
 const pillars = [
   {
@@ -26,14 +26,14 @@ export default function HomePage() {
         <section className="panel-strong rounded-[32px] px-6 py-8 sm:px-10 sm:py-10">
           <div className="grid gap-10 lg:grid-cols-[1.4fr_0.9fr] lg:items-end">
             <div className="space-y-6">
-              <p className="eyebrow">Urbex Dashboard Platform</p>
+              <p className="eyebrow">Hydrex</p>
               <div className="space-y-4">
                 <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.04em] sm:text-6xl">
-                  Build the controlled access layer first, then let Urbex DB grow on top of it.
+                  Explore Urbex DB, unlock access, and submit new locations for review.
                 </h1>
                 <p className="max-w-2xl text-base leading-7 text-[var(--text-muted)] sm:text-lg">
-                  This foundation ships the first real vertical slice: account flow, gated
-                  dashboard, license redemption prototype, and a map-backed Urbex DB shell.
+                  Public visitors can learn about the platform, while licensed members unlock the
+                  Urbex database, contributor ranking, and submission pipeline.
                 </p>
               </div>
 
@@ -54,29 +54,22 @@ export default function HomePage() {
                   href="/dashboard"
                   className="rounded-full border border-[var(--line)] px-5 py-3 text-sm font-semibold"
                 >
-                  View dashboard shell
+                  View dashboard
                 </Link>
               </div>
             </div>
 
             <div className="panel rounded-[28px] p-6">
-              <div className="flex items-center justify-between border-b border-[var(--line)] pb-4">
-                <div>
-                  <p className="eyebrow">Current slice</p>
-                  <p className="mt-2 text-2xl font-semibold">Phase 0 to Phase 1</p>
-                </div>
-                <Compass className="size-8 text-[var(--olive)]" />
-              </div>
-
+              <p className="eyebrow">What you unlock</p>
               <div className="mt-6 grid gap-4 text-sm text-[var(--text-muted)]">
                 <div className="rounded-3xl bg-white/70 p-4">
-                  Auth is powered by Firebase Authentication with real account state.
+                  Search approved locations by area, state, address, and region.
                 </div>
                 <div className="rounded-3xl bg-white/70 p-4">
-                  License redemption now updates Firestore user roles for gated app access.
+                  Submit new locations for moderation once your account has access.
                 </div>
                 <div className="rounded-3xl bg-white/70 p-4">
-                  Urbex DB reads approved pins and moderation queue data from Firestore.
+                  Track contributor ranking directly inside the Urbex experience.
                 </div>
               </div>
             </div>
@@ -96,15 +89,14 @@ export default function HomePage() {
         <section className="panel rounded-[32px] px-6 py-6 sm:px-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="eyebrow">Firebase-ready</p>
+              <p className="eyebrow">Access model</p>
               <p className="mt-2 text-sm leading-7 text-[var(--text-muted)]">
-                Create accounts from the signup page. Role defaults to base and upgrades to
-                licensed when a valid key is redeemed.
+                Create an account, redeem a valid key, and unlock the Urbex member experience.
               </p>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
               <MapPinned className="size-4 text-[var(--accent)]" />
-              Cloudflare-first scaffold
+              Public access available
             </div>
           </div>
         </section>

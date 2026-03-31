@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { FirebaseConfigWarning, useAuth } from "@/components/auth-provider";
+import { useAuth } from "@/components/auth-provider";
 
 const errorCopy: Record<string, string> = {
   "auth/email-already-in-use": "An account with this email already exists.",
@@ -62,10 +62,6 @@ export default function SignupPage() {
         <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
           New accounts start as base users. Premium access is unlocked after license redemption.
         </p>
-
-        <div className="mt-4">
-          <FirebaseConfigWarning />
-        </div>
 
         {errorMessage ? (
           <div className="mt-6 rounded-3xl border border-[color:var(--danger)]/20 bg-[color:var(--danger)]/8 px-4 py-3 text-sm text-[var(--danger)]">

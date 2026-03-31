@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [showWelcome, setShowWelcome] = useState(false);
   const [showRedeemed, setShowRedeemed] = useState(false);
+  const isAdmin = profile?.role === "admin";
 
   useEffect(() => {
     if (!loading && !user) {
@@ -70,10 +71,6 @@ export default function DashboardPage() {
               <p>{profile?.email ?? user.email}</p>
               <p className="mt-1 uppercase tracking-[0.18em]">Role: {profile?.role ?? "base"}</p>
             </div>
-          </div>
-
-          <div className="mt-6">
-            <FirebaseConfigWarning />
           </div>
 
           {showWelcome ? (
@@ -137,17 +134,7 @@ export default function DashboardPage() {
               </Link>
             </section>
 
-            <section className="panel rounded-[28px] p-6">
-              <p className="eyebrow">Implementation status</p>
-              <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--text-muted)]">
-                <p>Auth provider: {firebaseReady ? "Firebase" : "not configured"}</p>
-                <p>Urbex DB access: {hasAppAccess(profile, "urbex-db") ? "yes" : "no"}</p>
-                <p>Moderator tools: {profile?.role === "mod" || profile?.role === "admin" ? "yes" : "no"}</p>
-                <p>Cloudflare adapter: configured through OpenNext and Wrangler.</p>
-              </div>
-            </section>
-
-            {profile?.role === "admin" ? (
+            {isAdmin ? (
               <section className="panel rounded-[28px] p-6">
                 <p className="eyebrow">Admin controls</p>
                 <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
@@ -160,21 +147,23 @@ export default function DashboardPage() {
                   Open admin panel
                   <ArrowRight className="size-4" />
                 </Link>
+
+                <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--text-muted)]">
+                  <p>Auth provider: {firebaseReady ? "Firebase" : "not configured"}</p>
+                  <p>Urbex DB access: {hasAppAccess(profile, "urbex-db") ? "yes" : "no"}</p>
+                  <p>Moderator tools: {profile?.role === "mod" || profile?.role === "admin" ? "yes" : "no"}</p>
+                  <p>Hosting route: restricted to admins</p>
+                </div>
+
+                <div className="mt-5">
+                  <FirebaseConfigWarning />
+                </div>
+
+                <div className="mt-5 rounded-[24px] bg-white/70 p-4">
+                  <FirebaseProjectBadge />
+                </div>
               </section>
             ) : null}
-
-            <section className="panel rounded-[28px] p-6">
-              <p className="eyebrow">Next implementation targets</p>
-              <ul className="mt-5 space-y-3 text-sm leading-7 text-[var(--text-muted)]">
-                <li>Add location submission writes to Firestore with moderation queue flow.</li>
-                <li>Enable R2 and signed uploads for submission media.</li>
-                <li>Automate license key issuance from Patreon webhook sync.</li>
-              </ul>
-            </section>
-
-            <div className="panel rounded-[28px] p-6">
-              <FirebaseProjectBadge />
-            </div>
 
             <button
               type="button"

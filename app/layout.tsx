@@ -17,7 +17,7 @@ const mono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Urbex Dashboard",
-  description: "Cloudflare-first control center for Urbex DB and future platform apps."
+  description: "Public access portal for Hydrex and the Urbex DB member experience."
 };
 
 export default function RootLayout({

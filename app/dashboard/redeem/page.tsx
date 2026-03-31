@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { FirebaseConfigWarning, useAuth } from "@/components/auth-provider";
+import { useAuth } from "@/components/auth-provider";
 import { redeemLicense } from "@/lib/firebase/firestore";
 
 const errorCopy: Record<string, string> = {
@@ -68,10 +68,6 @@ export default function RedeemPage() {
         <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
           Redeem one HYDREX key at a time. Each key unlocks one app, or promotes to admin if it is an admin key.
         </p>
-
-        <div className="mt-4">
-          <FirebaseConfigWarning />
-        </div>
 
         {errorMessage ? (
           <div className="mt-6 rounded-3xl border border-[color:var(--danger)]/20 bg-[color:var(--danger)]/8 px-4 py-3 text-sm text-[var(--danger)]">
