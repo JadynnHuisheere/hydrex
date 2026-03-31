@@ -17,6 +17,7 @@ import {
   type SubmissionRecord,
   type UserProfile
 } from "@/lib/firebase/firestore";
+import { uploadSubmissionMedia } from "@/lib/firebase/storage";
 
 const UrbexMap = dynamic(
   () => import("@/components/urbex-map").then((module) => module.UrbexMap),
@@ -43,12 +44,14 @@ export default function UrbexDbPage() {
   const [submissionPending, setSubmissionPending] = useState(false);
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [mapSelectionMessage, setMapSelectionMessage] = useState<string | null>(null);
+  const [streetViewTarget, setStreetViewTarget] = useState<{ lat: number; lng: number; title: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedState, setSelectedState] = useState("all");
   const [latValue, setLatValue] = useState("");
   const [lngValue, setLngValue] = useState("");
   const submissionFormRef = useRef<HTMLFormElement | null>(null);
   const submissionTitleInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasUrbexAccess = hasAppAccess(profile, "urbex-db");
   const canModerate = profile?.role === "admin" || profile?.role === "mod" || hasAppAccess(profile, "moderation");
@@ -120,6 +123,15 @@ export default function UrbexDbPage() {
     setSubmissionPending(true);
     setSubmissionMessage(null);
 
+    const selectedFiles = (formData.getAll("mediaFiles") as File[]).filter((file) => file.size > 0);
+    const upload = await uploadSubmissionMedia(user.uid, selectedFiles);
+
+    if (!upload.ok) {
+      setSubmissionMessage("Could not upload media files. Check Firebase Storage rules and try again.");
+      setSubmissionPending(false);
+      return;
+    }
+
     const result = await submitLocationSubmission({
       uid: user.uid,
       submittedBy: profile?.name ?? user.displayName ?? user.email ?? "Explorer",
@@ -132,6 +144,7 @@ export default function UrbexDbPage() {
       description: String(formData.get("description") ?? ""),
       note: String(formData.get("note") ?? ""),
       images: Number(formData.get("images") ?? 0),
+      media: upload.media,
       imageUrls: String(formData.get("imageUrls") ?? "")
         .split(/\r?\n|,/) 
         .map((value) => value.trim())
@@ -149,6 +162,9 @@ export default function UrbexDbPage() {
     }
 
     submissionFormRef.current?.reset();
+    if (mediaInputRef.current) {
+      mediaInputRef.current.value = "";
+    }
     setLatValue("");
     setLngValue("");
     setMapSelectionMessage(null);
@@ -177,7 +193,7 @@ export default function UrbexDbPage() {
     }, 200);
   }
 
-  const leaderboardTop = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
+  const leaderboardTop = useMemo(() => leaderboard.slice(0, 50), [leaderboard]);
   const availableStates = useMemo(
     () => Array.from(new Set(approvedLocations.map((location) => location.state))).sort(),
     [approvedLocations]
@@ -277,7 +293,13 @@ export default function UrbexDbPage() {
                   </select>
                 </label>
               </div>
-              <UrbexMap locations={filteredLocations} onSelectSubmissionPoint={onSelectSubmissionPoint} />
+              <UrbexMap
+                locations={filteredLocations}
+                onSelectSubmissionPoint={onSelectSubmissionPoint}
+                onOpenStreetView={(point) => {
+                  setStreetViewTarget(point);
+                }}
+              />
               {mapSelectionMessage ? (
                 <p className="mt-4 rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--text-muted)]">
                   {mapSelectionMessage}
@@ -385,6 +407,17 @@ export default function UrbexDbPage() {
 
                 <div className="grid gap-4 md:grid-cols-[1fr_180px]">
                   <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Upload images/videos</span>
+                    <input
+                      ref={mediaInputRef}
+                      name="mediaFiles"
+                      type="file"
+                      accept="image/*,video/*"
+                      multiple
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
                     <span>Image URLs</span>
                     <textarea
                       name="imageUrls"
@@ -404,7 +437,9 @@ export default function UrbexDbPage() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-[1fr_180px]">
-                  <div />
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Uploaded files and URL media both show in map pin previews.
+                  </div>
                   <label className="space-y-2 text-sm text-[var(--text-muted)]">
                     <span>Image count</span>
                     <input
@@ -545,7 +580,7 @@ export default function UrbexDbPage() {
             </section>
 
             <section id="leaderboard" className="panel rounded-[32px] p-6">
-              <p className="eyebrow">Leaderboard snapshot</p>
+              <p className="eyebrow">Leaderboard top 50</p>
               <div className="mt-5 space-y-3">
                 {leaderboardTop.length === 0 ? (
                   <div className="rounded-[24px] bg-white/80 p-4 text-sm text-[var(--text-muted)]">
@@ -568,6 +603,36 @@ export default function UrbexDbPage() {
           Back to dashboard
         </Link>
       </div>
+
+      {streetViewTarget ? (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/65 p-4">
+          <div className="panel-strong w-full max-w-4xl rounded-[24px] p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Street View: {streetViewTarget.title}</p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {streetViewTarget.lat.toFixed(6)}, {streetViewTarget.lng.toFixed(6)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStreetViewTarget(null);
+                }}
+                className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
+            <iframe
+              title={`Street View ${streetViewTarget.title}`}
+              src={`https://maps.google.com/maps?q=&layer=c&cbll=${streetViewTarget.lat},${streetViewTarget.lng}&cbp=11,0,0,0,0&output=svembed`}
+              className="h-[70vh] w-full rounded-[16px] border border-[var(--line)]"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

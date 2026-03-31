@@ -7,6 +7,10 @@ type Timestamp = import("firebase/firestore").Timestamp;
 
 export type UserRole = "base" | "licensed" | "mod" | "admin";
 export type AppLicense = "urbex-db" | "moderation";
+export type MediaAsset = {
+  kind: "image" | "video";
+  url: string;
+};
 
 type AppAccessMap = Record<AppLicense, boolean>;
 
@@ -44,6 +48,7 @@ export type LocationRecord = {
   points: number;
   images: number;
   imageUrls: string[];
+  media: MediaAsset[];
   lat: number;
   lng: number;
   description: string;
@@ -59,6 +64,7 @@ export type SubmissionRecord = {
   createdAt: string;
   images: number;
   imageUrls: string[];
+  media: MediaAsset[];
   note: string;
   region: string;
   state: string;
@@ -105,6 +111,30 @@ function normalizeAppAccess(raw: unknown): AppAccessMap {
     "urbex-db": Boolean(source["urbex-db"]),
     moderation: Boolean(source.moderation)
   };
+}
+
+function normalizeMedia(raw: unknown): MediaAsset[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const item = entry as Record<string, unknown>;
+      const kind = item.kind;
+      const url = item.url;
+
+      if ((kind !== "image" && kind !== "video") || typeof url !== "string" || !/^https?:\/\//i.test(url)) {
+        return null;
+      }
+
+      return { kind, url } satisfies MediaAsset;
+    })
+    .filter((entry): entry is MediaAsset => Boolean(entry));
 }
 
 function mapUserProfile(uid: string, data: Record<string, unknown>): UserProfile {
@@ -555,6 +585,11 @@ export async function fetchApprovedLocations() {
 
   const mapped = snap.docs.map((entry) => {
     const data = entry.data() as Record<string, unknown>;
+    const media = normalizeMedia(data.media);
+    const fallbackImageUrls = Array.isArray(data.imageUrls)
+      ? data.imageUrls.filter((value): value is string => typeof value === "string")
+      : [];
+    const imageUrls = media.filter((item) => item.kind === "image").map((item) => item.url);
 
     return {
       id: entry.id,
@@ -564,10 +599,11 @@ export async function fetchApprovedLocations() {
       address: String(data.address ?? "Address unavailable"),
       status: "approved" as const,
       points: Number(data.points ?? 0),
-      images: Number(data.images ?? 0),
-      imageUrls: Array.isArray(data.imageUrls)
-        ? data.imageUrls.filter((value): value is string => typeof value === "string")
-        : [],
+      images: Math.max(Number(data.images ?? 0), imageUrls.length, fallbackImageUrls.length),
+      imageUrls: imageUrls.length > 0 ? imageUrls : fallbackImageUrls,
+      media: media.length > 0
+        ? media
+        : fallbackImageUrls.map((url) => ({ kind: "image", url } satisfies MediaAsset)),
       lat: Number(data.lat ?? 0),
       lng: Number(data.lng ?? 0),
       description: String(data.description ?? "No description."),
@@ -609,6 +645,11 @@ export async function fetchPendingSubmissions() {
   return sorted.map((entry) => {
     const data = entry.data() as Record<string, unknown>;
     const createdAt = data.createdAt as Timestamp | undefined;
+    const media = normalizeMedia(data.media);
+    const fallbackImageUrls = Array.isArray(data.imageUrls)
+      ? data.imageUrls.filter((value): value is string => typeof value === "string")
+      : [];
+    const imageUrls = media.filter((item) => item.kind === "image").map((item) => item.url);
 
     return {
       id: entry.id,
@@ -616,10 +657,11 @@ export async function fetchPendingSubmissions() {
       submittedBy: String(data.submittedBy ?? "Unknown"),
       submittedByUid: typeof data.submittedByUid === "string" ? data.submittedByUid : undefined,
       createdAt: createdAt ? createdAt.toDate().toLocaleString() : "unknown time",
-      images: Number(data.images ?? 0),
-      imageUrls: Array.isArray(data.imageUrls)
-        ? data.imageUrls.filter((value): value is string => typeof value === "string")
-        : [],
+      images: Math.max(Number(data.images ?? 0), imageUrls.length, fallbackImageUrls.length),
+      imageUrls: imageUrls.length > 0 ? imageUrls : fallbackImageUrls,
+      media: media.length > 0
+        ? media
+        : fallbackImageUrls.map((url) => ({ kind: "image", url } satisfies MediaAsset)),
       note: String(data.note ?? "Awaiting moderator review."),
       region: String(data.region ?? "Unknown"),
       state: String(data.state ?? "Unknown"),
@@ -642,6 +684,7 @@ export async function submitLocationSubmission(input: {
   note?: string;
   images?: number;
   imageUrls?: string[];
+  media?: MediaAsset[];
 }) {
   const app = getDb();
 
@@ -662,7 +705,18 @@ export async function submitLocationSubmission(input: {
     .map((value) => value.trim())
     .filter((value) => /^https?:\/\//i.test(value))
     .slice(0, 8);
-  const images = Math.max(0, Math.max(Number(input.images ?? 0), imageUrls.length));
+  const explicitMedia = (input.media ?? []).filter((item) => /^https?:\/\//i.test(item.url)).slice(0, 8);
+  const normalizedMedia = explicitMedia.length > 0
+    ? explicitMedia
+    : imageUrls.map((url) => ({ kind: "image", url } satisfies MediaAsset));
+  const images = Math.max(
+    0,
+    Math.max(
+      Number(input.images ?? 0),
+      normalizedMedia.filter((item) => item.kind === "image").length,
+      imageUrls.length
+    )
+  );
 
   if (title.length < 3 || region.length < 2 || state.length < 2 || address.length < 5 || description.length < 12) {
     return { ok: false, reason: "invalid-submission" } as const;
@@ -685,6 +739,7 @@ export async function submitLocationSubmission(input: {
     submittedBy: input.submittedBy,
     submittedByUid: input.uid,
     images,
+    media: normalizedMedia,
     imageUrls,
     note,
     createdAt: firestore.serverTimestamp()
