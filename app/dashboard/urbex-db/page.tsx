@@ -458,6 +458,20 @@ export default function UrbexDbPage() {
     setMapSearchPending(false);
   }
 
+  function onGoToLocation(location: LocationRecord) {
+    setMapSearchPoint({
+      lat: location.lat,
+      lng: location.lng,
+      label: location.title
+    });
+    setMapSearchMessage(`Focused map on ${location.title}.`);
+    setClearTempPinToken((current) => current + 1);
+
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
   const leaderboardTop = useMemo(() => leaderboard.slice(0, 50), [leaderboard]);
   const availableStates = useMemo(
     () => Array.from(new Set(approvedLocations.map((location) => location.state))).sort(),
@@ -531,7 +545,7 @@ export default function UrbexDbPage() {
                 onDropPanel("map");
               }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-5">
+              <div className="flex flex-col gap-3 pb-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
                   <button
                     type="button"
@@ -548,7 +562,7 @@ export default function UrbexDbPage() {
                     <p className="text-sm text-[var(--text-muted)]">Search & explore approved locations</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
                   <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                     <span>Size</span>
                     <input
@@ -577,7 +591,7 @@ export default function UrbexDbPage() {
                   className="space-y-2 text-sm text-[var(--text-muted)]"
                 >
                   <span className="block">Street address search</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <input
                       value={mapSearchTerm}
                       onChange={(event) => {
@@ -639,7 +653,7 @@ export default function UrbexDbPage() {
             </article>
 
             <article
-              className="panel rounded-[32px] p-6"
+              className="panel rounded-[32px] p-4 sm:p-6"
               style={{ order: panelOrder.submission }}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -648,7 +662,7 @@ export default function UrbexDbPage() {
                 onDropPanel("submission");
               }}
             >
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
                   <button
                     type="button"
@@ -665,7 +679,7 @@ export default function UrbexDbPage() {
                     <p className="text-sm text-[var(--text-muted)]">Share new spots for review</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                   <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-xs font-semibold text-[var(--accent)]">
                     Urbex access
                   </span>
@@ -875,7 +889,7 @@ export default function UrbexDbPage() {
           <div className="flex flex-col gap-6">
             {canModerate ? (
               <section
-                className="panel rounded-[32px] p-6"
+                className="panel rounded-[32px] p-4 sm:p-6"
                 style={{ order: panelOrder.moderator }}
                 onDragOver={(event) => {
                   event.preventDefault();
@@ -939,7 +953,7 @@ export default function UrbexDbPage() {
             ) : null}
 
             <section
-              className="panel rounded-[32px] p-6"
+              className="panel rounded-[32px] p-4 sm:p-6"
               style={{ order: panelOrder.approved }}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -976,7 +990,7 @@ export default function UrbexDbPage() {
                 </button>
               </div>
               {showApprovedLocations ? (
-              <div className="mt-6 space-y-3">
+              <div className="mt-6 max-h-[24rem] space-y-3 overflow-y-auto pr-1">
                 {filteredLocations.map((location) => (
                   <div key={location.id} className="rounded-[20px] bg-white/80 p-4 border border-[var(--line)] hover:border-[var(--accent)] transition">
                     <div className="flex items-start justify-between gap-3">
@@ -989,6 +1003,17 @@ export default function UrbexDbPage() {
                     <div className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
                       <p>📍 {location.region} • {location.state} • {location.address}</p>
                       <p>👤 {location.submittedBy}</p>
+                    </div>
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onGoToLocation(location);
+                        }}
+                        className="rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold hover:bg-white/60 transition"
+                      >
+                        Go to pin
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1004,7 +1029,7 @@ export default function UrbexDbPage() {
             {canModerate ? (
             <section
               id="queue"
-              className="panel rounded-[32px] p-6"
+              className="panel rounded-[32px] p-4 sm:p-6"
               style={{ order: panelOrder.queue }}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -1092,7 +1117,7 @@ export default function UrbexDbPage() {
 
             <section
               id="leaderboard"
-              className="panel rounded-[32px] p-6"
+              className="panel rounded-[32px] p-4 sm:p-6"
               style={{ order: panelOrder.leaderboard }}
               onDragOver={(event) => {
                 event.preventDefault();
