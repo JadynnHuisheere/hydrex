@@ -60,7 +60,7 @@ function clusterLocations(locations: LocationPin[], zoom: number) {
     return [] as DisplayPin[];
   }
 
-  if (zoom >= 6) {
+  if (zoom >= 11) {
     return locations.map<DisplayPin>((location) => ({
       id: location.id,
       lat: location.lat,
@@ -78,6 +78,70 @@ function clusterLocations(locations: LocationPin[], zoom: number) {
       submittedBy: location.submittedBy,
       sampleTitles: [location.title]
     }));
+  }
+
+  if (zoom >= 8) {
+    const grouped = new Map<string, { items: LocationPin[]; lat: number; lng: number }>();
+
+    for (const location of locations) {
+      // Mid-zoom grid clustering reduces marker count and keeps panning smooth.
+      const latBucket = Math.round(location.lat * 2) / 2;
+      const lngBucket = Math.round(location.lng * 2) / 2;
+      const key = `${latBucket.toFixed(1)}:${lngBucket.toFixed(1)}`;
+      const current = grouped.get(key);
+
+      if (!current) {
+        grouped.set(key, { items: [location], lat: location.lat, lng: location.lng });
+        continue;
+      }
+
+      current.items.push(location);
+      current.lat += location.lat;
+      current.lng += location.lng;
+    }
+
+    return Array.from(grouped.entries()).map(([key, cluster]) => {
+      const first = cluster.items[0];
+      const count = cluster.items.length;
+
+      if (count === 1) {
+        return {
+          id: first.id,
+          lat: first.lat,
+          lng: first.lng,
+          count: 1,
+          isCluster: false,
+          title: first.title,
+          region: first.region,
+          state: first.state,
+          address: first.address,
+          images: first.images,
+          imageUrls: first.imageUrls,
+          media: first.media,
+          description: first.description,
+          submittedBy: first.submittedBy,
+          sampleTitles: [first.title]
+        } satisfies DisplayPin;
+      }
+
+      return {
+        id: key,
+        lat: cluster.lat / count,
+        lng: cluster.lng / count,
+        count,
+        isCluster: true,
+        title: `${first.state || "Unknown"} (${count})`,
+        region: first.region,
+        state: first.state,
+        address: first.address,
+        images: cluster.items.reduce((total, item) => total + item.images, 0),
+        imageUrls: [],
+        media: [],
+        description: "Zoom in further to show all pins for this area.",
+        submittedBy: "multiple explorers",
+        sampleTitles: cluster.items.slice(0, 5).map((item) => item.title)
+      } satisfies DisplayPin;
+    });
   }
 
   const grouped = new Map<string, { items: LocationPin[]; lat: number; lng: number }>();
@@ -410,7 +474,7 @@ export function UrbexMap({
 
   return (
     <div className="map-frame overflow-hidden rounded-[24px] border border-[var(--line)]" style={{ height }}>
-      <MapContainer center={center} zoom={5} scrollWheelZoom className="h-full w-full">
+      <MapContainer center={center} zoom={5} scrollWheelZoom preferCanvas className="h-full w-full">
         <MapSearchFocus searchPoint={searchPoint} />
         <TileLayer attribution={tileConfig.attribution} url={tileConfig.url} />
         {showRailwayOverlay ? (

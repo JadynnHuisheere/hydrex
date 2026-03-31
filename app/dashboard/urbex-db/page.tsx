@@ -226,11 +226,15 @@ export default function UrbexDbPage() {
     }
 
     const timer = window.setInterval(() => {
+      if (document.hidden) {
+        return;
+      }
+
       void refreshPanels();
       if (selectedPin) {
         void openPinForum(selectedPin);
       }
-    }, 10000);
+    }, 30000);
 
     return () => {
       window.clearInterval(timer);
