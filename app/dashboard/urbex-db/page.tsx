@@ -51,6 +51,19 @@ type SelectedPin = {
   media: Array<{ kind: "image" | "video"; url: string }>;
 };
 
+type AiCandidate = {
+  id: string;
+  label: string;
+  state: string;
+  region: string;
+  lat: number;
+  lng: number;
+  score: number;
+  confidence: "high" | "medium" | "low";
+  recommendedMapStyle: "street" | "satellite" | "topo";
+  rationale: string[];
+};
+
 export default function UrbexDbPage() {
   const { loading, user, profile } = useAuth();
   const router = useRouter();
@@ -67,6 +80,14 @@ export default function UrbexDbPage() {
   const [mapSearchPending, setMapSearchPending] = useState(false);
   const [mapSearchMessage, setMapSearchMessage] = useState<string | null>(null);
   const [mapSearchPoint, setMapSearchPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiSatelliteSignals, setAiSatelliteSignals] = useState("large flat roofs, collapsed structures, lot overgrowth");
+  const [aiTopoSignals, setAiTopoSignals] = useState("rail corridors, valley edges, river bends");
+  const [aiFocusState, setAiFocusState] = useState("all");
+  const [aiCandidateCount, setAiCandidateCount] = useState(8);
+  const [aiCandidates, setAiCandidates] = useState<AiCandidate[]>([]);
+  const [aiFindingPending, setAiFindingPending] = useState(false);
+  const [aiFindingMessage, setAiFindingMessage] = useState<string | null>(null);
   const [selectedState, setSelectedState] = useState("all");
   const [mapStyle, setMapStyle] = useState<"street" | "satellite" | "topo">("street");
   const [showRailwayOverlay, setShowRailwayOverlay] = useState(false);
@@ -472,6 +493,70 @@ export default function UrbexDbPage() {
     }
 
     setMapSearchPending(false);
+  }
+
+  async function onRunAiProspecting() {
+    if (approvedLocations.length < 3) {
+      setAiFindingMessage("Add at least 3 approved locations before AI prospecting can infer new zones.");
+      return;
+    }
+
+    setAiFindingPending(true);
+    setAiFindingMessage(null);
+
+    try {
+      const response = await fetch("/api/ai/abandoned-candidates", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          satelliteSignals: aiSatelliteSignals,
+          topoSignals: aiTopoSignals,
+          focusState: aiFocusState === "all" ? null : aiFocusState,
+          candidateCount: aiCandidateCount,
+          mapStyle,
+          center: mapSearchPoint
+            ? {
+                lat: mapSearchPoint.lat,
+                lng: mapSearchPoint.lng
+              }
+            : null,
+          knownLocations: approvedLocations.map((location) => ({
+            id: location.id,
+            title: location.title,
+            region: location.region,
+            state: location.state,
+            address: location.address,
+            lat: location.lat,
+            lng: location.lng,
+            description: location.description
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        setAiFindingMessage("AI prospecting is unavailable right now.");
+        setAiCandidates([]);
+        setAiFindingPending(false);
+        return;
+      }
+
+      const data = (await response.json()) as {
+        candidates?: AiCandidate[];
+        message?: string;
+      };
+
+      const nextCandidates = Array.isArray(data.candidates) ? data.candidates : [];
+      setAiCandidates(nextCandidates);
+      setAiFindingMessage(data.message ?? `Generated ${nextCandidates.length} candidate zones.`);
+    } catch {
+      setAiFindingMessage("AI prospecting request failed. Try again in a moment.");
+      setAiCandidates([]);
+    }
+
+    setAiFindingPending(false);
   }
 
   function onGoToLocation(location: LocationRecord) {
@@ -887,6 +972,180 @@ export default function UrbexDbPage() {
                   {mapSelectionMessage}
                 </p>
               ) : null}
+
+              <section className="mt-5 rounded-[16px] border border-[var(--line)] bg-white/75 p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">AI prospecting</p>
+                    <p className="mt-1 text-base font-semibold">Find new abandoned-place candidates</p>
+                  </div>
+                  <span className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    Learns from {approvedLocations.length} approved records
+                  </span>
+                </div>
+
+                <p className="mt-3 text-sm text-[var(--text-muted)]">
+                  Uses patterns from known submissions plus your topology and satellite cues to suggest search zones.
+                </p>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Target state</span>
+                    <select
+                      value={aiFocusState}
+                      onChange={(event) => {
+                        setAiFocusState(event.target.value);
+                      }}
+                      className="w-full rounded-[12px] border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[var(--text)] outline-none"
+                    >
+                      <option value="all">All states</option>
+                      {availableStates.map((state) => (
+                        <option key={`ai-${state}`} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Candidate count</span>
+                    <input
+                      type="number"
+                      min={3}
+                      max={20}
+                      value={aiCandidateCount}
+                      onChange={(event) => {
+                        setAiCandidateCount(Number(event.target.value));
+                      }}
+                      className="w-full rounded-[12px] border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Satellite clues</span>
+                    <textarea
+                      rows={3}
+                      value={aiSatelliteSignals}
+                      onChange={(event) => {
+                        setAiSatelliteSignals(event.target.value);
+                      }}
+                      placeholder="overgrown lots, roof collapse, empty parking lots"
+                      className="w-full rounded-[12px] border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[var(--text)] outline-none"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Topo clues</span>
+                    <textarea
+                      rows={3}
+                      value={aiTopoSignals}
+                      onChange={(event) => {
+                        setAiTopoSignals(event.target.value);
+                      }}
+                      placeholder="ridge edge, river bend, rail cut, valley approach"
+                      className="w-full rounded-[12px] border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                </div>
+
+                <label className="mt-3 block space-y-2 text-sm text-[var(--text-muted)]">
+                  <span>Mission prompt (optional)</span>
+                  <textarea
+                    rows={2}
+                    value={aiPrompt}
+                    onChange={(event) => {
+                      setAiPrompt(event.target.value);
+                    }}
+                    placeholder="ex: old paper mills near waterways with freight access"
+                    className="w-full rounded-[12px] border border-[var(--line)] bg-white/80 px-3 py-2.5 text-[var(--text)] outline-none"
+                  />
+                </label>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void onRunAiProspecting();
+                    }}
+                    disabled={aiFindingPending}
+                    className="rounded-[10px] bg-[var(--accent)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {aiFindingPending ? "Scanning" : "Run AI prospecting"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiCandidates([]);
+                      setAiFindingMessage(null);
+                    }}
+                    className="rounded-[10px] border border-[var(--line)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em]"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                {aiFindingMessage ? (
+                  <p className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">
+                    {aiFindingMessage}
+                  </p>
+                ) : null}
+
+                {aiCandidates.length > 0 ? (
+                  <div className="mt-4 max-h-[20rem] space-y-2 overflow-y-auto pr-1">
+                    {aiCandidates.map((candidate) => (
+                      <div key={candidate.id} className="rounded-[12px] border border-[var(--line)] bg-white/80 p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold">{candidate.label}</p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {candidate.region} • {candidate.state} • {candidate.confidence} confidence
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-xs font-semibold text-[var(--text-muted)]">
+                            {candidate.score} / 100
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs text-[var(--text-muted)]">
+                          {candidate.lat.toFixed(5)}, {candidate.lng.toFixed(5)}
+                        </p>
+                        <div className="mt-2 text-xs text-[var(--text-muted)]">
+                          {candidate.rationale.map((entry) => (
+                            <p key={`${candidate.id}-${entry}`}>• {entry}</p>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMapSearchPoint({
+                                lat: candidate.lat,
+                                lng: candidate.lng,
+                                label: candidate.label
+                              });
+                              setMapSearchMessage(`Focused map on AI candidate: ${candidate.label}.`);
+                              setClearTempPinToken((current) => current + 1);
+                            }}
+                            className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]"
+                          >
+                            Focus map
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMapStyle(candidate.recommendedMapStyle);
+                            }}
+                            className="rounded-[10px] border border-[var(--line)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]"
+                          >
+                            View: {candidate.recommendedMapStyle}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
             </article>
 
             <article
