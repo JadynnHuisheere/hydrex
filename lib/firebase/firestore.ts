@@ -42,6 +42,8 @@ export type LocationRecord = {
   address: string;
   status: "approved" | "pending" | "rejected";
   points: number;
+  images: number;
+  imageUrls: string[];
   lat: number;
   lng: number;
   description: string;
@@ -56,6 +58,7 @@ export type SubmissionRecord = {
   submittedByUid?: string;
   createdAt: string;
   images: number;
+  imageUrls: string[];
   note: string;
   region: string;
   state: string;
@@ -561,6 +564,10 @@ export async function fetchApprovedLocations() {
       address: String(data.address ?? "Address unavailable"),
       status: "approved" as const,
       points: Number(data.points ?? 0),
+      images: Number(data.images ?? 0),
+      imageUrls: Array.isArray(data.imageUrls)
+        ? data.imageUrls.filter((value): value is string => typeof value === "string")
+        : [],
       lat: Number(data.lat ?? 0),
       lng: Number(data.lng ?? 0),
       description: String(data.description ?? "No description."),
@@ -610,6 +617,9 @@ export async function fetchPendingSubmissions() {
       submittedByUid: typeof data.submittedByUid === "string" ? data.submittedByUid : undefined,
       createdAt: createdAt ? createdAt.toDate().toLocaleString() : "unknown time",
       images: Number(data.images ?? 0),
+      imageUrls: Array.isArray(data.imageUrls)
+        ? data.imageUrls.filter((value): value is string => typeof value === "string")
+        : [],
       note: String(data.note ?? "Awaiting moderator review."),
       region: String(data.region ?? "Unknown"),
       state: String(data.state ?? "Unknown"),
@@ -631,6 +641,7 @@ export async function submitLocationSubmission(input: {
   description: string;
   note?: string;
   images?: number;
+  imageUrls?: string[];
 }) {
   const app = getDb();
 
@@ -647,7 +658,11 @@ export async function submitLocationSubmission(input: {
   const address = input.address.trim();
   const description = input.description.trim();
   const note = input.note?.trim() || "Awaiting moderator review.";
-  const images = Math.max(0, Number(input.images ?? 0));
+  const imageUrls = (input.imageUrls ?? [])
+    .map((value) => value.trim())
+    .filter((value) => /^https?:\/\//i.test(value))
+    .slice(0, 8);
+  const images = Math.max(0, Math.max(Number(input.images ?? 0), imageUrls.length));
 
   if (title.length < 3 || region.length < 2 || state.length < 2 || address.length < 5 || description.length < 12) {
     return { ok: false, reason: "invalid-submission" } as const;
@@ -670,6 +685,7 @@ export async function submitLocationSubmission(input: {
     submittedBy: input.submittedBy,
     submittedByUid: input.uid,
     images,
+    imageUrls,
     note,
     createdAt: firestore.serverTimestamp()
   });

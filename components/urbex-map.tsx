@@ -16,6 +16,8 @@ type LocationPin = {
   region: string;
   state: string;
   address: string;
+  images: number;
+  imageUrls: string[];
   lat: number;
   lng: number;
   description: string;
@@ -24,6 +26,7 @@ type LocationPin = {
 
 type UrbexMapProps = {
   locations: LocationPin[];
+  onSelectSubmissionPoint?: (point: { lat: number; lng: number }) => void;
 };
 
 type DisplayPin = {
@@ -36,6 +39,8 @@ type DisplayPin = {
   region: string;
   state: string;
   address: string;
+  images: number;
+  imageUrls: string[];
   description: string;
   submittedBy: string;
   sampleTitles: string[];
@@ -75,6 +80,8 @@ function clusterLocations(locations: LocationPin[], zoom: number) {
       region: location.region,
       state: location.state,
       address: location.address,
+      images: location.images,
+      imageUrls: location.imageUrls,
       description: location.description,
       submittedBy: location.submittedBy,
       sampleTitles: [location.title]
@@ -114,6 +121,8 @@ function clusterLocations(locations: LocationPin[], zoom: number) {
         region: first.region,
         state: first.state,
         address: first.address,
+        images: first.images,
+        imageUrls: first.imageUrls,
         description: first.description,
         submittedBy: first.submittedBy,
         sampleTitles: [first.title]
@@ -130,6 +139,8 @@ function clusterLocations(locations: LocationPin[], zoom: number) {
       region: first.region,
       state: first.state,
       address: first.address,
+      images: cluster.items.reduce((total, item) => total + item.images, 0),
+      imageUrls: [],
       description: "Zoom in to split this cluster into individual locations.",
       submittedBy: "multiple explorers",
       sampleTitles: cluster.items.slice(0, 5).map((item) => item.title)
@@ -146,9 +157,10 @@ function isInBounds(location: LocationPin, bounds: LatLngBounds | null) {
   return padded.contains([location.lat, location.lng]);
 }
 
-function MapViewportMarkers({ locations }: UrbexMapProps) {
+function MapViewportMarkers({ locations, onSelectSubmissionPoint }: UrbexMapProps) {
   const [zoom, setZoom] = useState(14);
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
+  const [tempPoint, setTempPoint] = useState<{ lat: number; lng: number } | null>(null);
 
   useMapEvents({
     load(event) {
@@ -161,6 +173,9 @@ function MapViewportMarkers({ locations }: UrbexMapProps) {
     zoomend(event) {
       setZoom(event.target.getZoom());
       setBounds(event.target.getBounds());
+    },
+    click(event) {
+      setTempPoint({ lat: event.latlng.lat, lng: event.latlng.lng });
     }
   });
 
@@ -193,7 +208,37 @@ function MapViewportMarkers({ locations }: UrbexMapProps) {
               <p className="text-sm font-semibold">{pin.title}</p>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>{pin.region} • {pin.state}</p>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>{pin.address}</p>
+              {!pin.isCluster && pin.imageUrls[0] ? (
+                <div className="overflow-hidden rounded-xl border border-[var(--line)]">
+                  <img
+                    src={pin.imageUrls[0]}
+                    alt={`${pin.title} preview`}
+                    className="h-32 w-full object-cover"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              ) : null}
+              {!pin.isCluster && pin.imageUrls.length > 1 ? (
+                <div className="grid grid-cols-3 gap-2">
+                  {pin.imageUrls.slice(1, 4).map((imageUrl) => (
+                    <img
+                      key={imageUrl}
+                      src={imageUrl}
+                      alt={`${pin.title} image`}
+                      className="h-16 w-full rounded-md border border-[var(--line)] object-cover"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  ))}
+                </div>
+              ) : null}
               <p className="text-sm leading-6">{pin.description}</p>
+              {!pin.isCluster ? (
+                <p className="text-xs uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
+                  {pin.images} images available
+                </p>
+              ) : null}
               {pin.isCluster ? (
                 <div className="text-xs" style={{ color: "var(--text-muted)" }}>
                   {pin.sampleTitles.map((title) => (
@@ -208,11 +253,42 @@ function MapViewportMarkers({ locations }: UrbexMapProps) {
           </Popup>
         </CircleMarker>
       ))}
+
+      {tempPoint ? (
+        <CircleMarker
+          center={[tempPoint.lat, tempPoint.lng]}
+          pathOptions={{
+            color: "var(--accent-strong)",
+            fillColor: "var(--accent)",
+            fillOpacity: 0.85,
+            weight: 2
+          }}
+          radius={8}
+        >
+          <Popup>
+            <div className="space-y-3">
+              <p className="text-sm font-semibold">Drop a submission here?</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {tempPoint.lat.toFixed(6)}, {tempPoint.lng.toFixed(6)}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectSubmissionPoint?.(tempPoint);
+                }}
+                className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)]"
+              >
+                Fill submission at this pin
+              </button>
+            </div>
+          </Popup>
+        </CircleMarker>
+      ) : null}
     </>
   );
 }
 
-export function UrbexMap({ locations }: UrbexMapProps) {
+export function UrbexMap({ locations, onSelectSubmissionPoint }: UrbexMapProps) {
   const center = locations[0]
     ? ([locations[0].lat, locations[0].lng] as [number, number])
     : ([39.8283, -98.5795] as [number, number]);
@@ -224,7 +300,7 @@ export function UrbexMap({ locations }: UrbexMapProps) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <MapViewportMarkers locations={locations} />
+        <MapViewportMarkers locations={locations} onSelectSubmissionPoint={onSelectSubmissionPoint} />
       </MapContainer>
     </div>
   );

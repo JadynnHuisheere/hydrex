@@ -42,9 +42,13 @@ export default function UrbexDbPage() {
   const [moderationMessage, setModerationMessage] = useState<string | null>(null);
   const [submissionPending, setSubmissionPending] = useState(false);
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
+  const [mapSelectionMessage, setMapSelectionMessage] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedState, setSelectedState] = useState("all");
+  const [latValue, setLatValue] = useState("");
+  const [lngValue, setLngValue] = useState("");
   const submissionFormRef = useRef<HTMLFormElement | null>(null);
+  const submissionTitleInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasUrbexAccess = hasAppAccess(profile, "urbex-db");
   const canModerate = profile?.role === "admin" || profile?.role === "mod" || hasAppAccess(profile, "moderation");
@@ -117,7 +121,11 @@ export default function UrbexDbPage() {
       lng: Number(formData.get("lng") ?? 0),
       description: String(formData.get("description") ?? ""),
       note: String(formData.get("note") ?? ""),
-      images: Number(formData.get("images") ?? 0)
+      images: Number(formData.get("images") ?? 0),
+      imageUrls: String(formData.get("imageUrls") ?? "")
+        .split(/\r?\n|,/) 
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
     });
 
     if (!result.ok) {
@@ -131,9 +139,32 @@ export default function UrbexDbPage() {
     }
 
     submissionFormRef.current?.reset();
+    setLatValue("");
+    setLngValue("");
+    setMapSelectionMessage(null);
     setSubmissionMessage("Submission sent to the moderation queue.");
     await refreshPanels();
     setSubmissionPending(false);
+  }
+
+  function onSelectSubmissionPoint(point: { lat: number; lng: number }) {
+    const nextLat = point.lat.toFixed(6);
+    const nextLng = point.lng.toFixed(6);
+
+    setLatValue(nextLat);
+    setLngValue(nextLng);
+    setMapSelectionMessage(`Temporary pin selected at ${nextLat}, ${nextLng}`);
+
+    const continueToForm = window.confirm("Use this pin for a new submission?");
+
+    if (!continueToForm) {
+      return;
+    }
+
+    submissionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => {
+      submissionTitleInputRef.current?.focus();
+    }, 200);
   }
 
   const leaderboardTop = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
@@ -236,7 +267,12 @@ export default function UrbexDbPage() {
                   </select>
                 </label>
               </div>
-              <UrbexMap locations={filteredLocations} />
+              <UrbexMap locations={filteredLocations} onSelectSubmissionPoint={onSelectSubmissionPoint} />
+              {mapSelectionMessage ? (
+                <p className="mt-4 rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--text-muted)]">
+                  {mapSelectionMessage}
+                </p>
+              ) : null}
             </article>
 
             <article className="panel rounded-[32px] p-6">
@@ -261,6 +297,7 @@ export default function UrbexDbPage() {
                   <label className="space-y-2 text-sm text-[var(--text-muted)]">
                     <span>Location title</span>
                     <input
+                      ref={submissionTitleInputRef}
                       name="title"
                       required
                       className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
@@ -303,6 +340,10 @@ export default function UrbexDbPage() {
                       type="number"
                       step="any"
                       required
+                      value={latValue}
+                      onChange={(event) => {
+                        setLatValue(event.target.value);
+                      }}
                       className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                     />
                   </label>
@@ -313,6 +354,10 @@ export default function UrbexDbPage() {
                       type="number"
                       step="any"
                       required
+                      value={lngValue}
+                      onChange={(event) => {
+                        setLngValue(event.target.value);
+                      }}
                       className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                     />
                   </label>
@@ -330,6 +375,15 @@ export default function UrbexDbPage() {
 
                 <div className="grid gap-4 md:grid-cols-[1fr_180px]">
                   <label className="space-y-2 text-sm text-[var(--text-muted)]">
+                    <span>Image URLs</span>
+                    <textarea
+                      name="imageUrls"
+                      rows={3}
+                      placeholder="https://... (separate by comma or new line)"
+                      className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-[var(--text-muted)]">
                     <span>Moderator note</span>
                     <input
                       name="note"
@@ -337,6 +391,10 @@ export default function UrbexDbPage() {
                       className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                     />
                   </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+                  <div />
                   <label className="space-y-2 text-sm text-[var(--text-muted)]">
                     <span>Image count</span>
                     <input
