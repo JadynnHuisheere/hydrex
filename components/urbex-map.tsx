@@ -181,8 +181,8 @@ function MapViewportMarkers({ locations }: UrbexMapProps) {
           key={pin.id}
           center={[pin.lat, pin.lng]}
           pathOptions={{
-            color: pin.isCluster ? "#6b5f53" : "#9f4015",
-            fillColor: pin.isCluster ? "#8f7d6f" : "#cb5f2f",
+            color: pin.isCluster ? "var(--pin-cluster-stroke)" : "var(--pin-stroke)",
+            fillColor: pin.isCluster ? "var(--pin-cluster-fill)" : "var(--pin-fill)",
             fillOpacity: 0.85,
             weight: 2
           }}
@@ -191,17 +191,17 @@ function MapViewportMarkers({ locations }: UrbexMapProps) {
           <Popup>
             <div className="space-y-2">
               <p className="text-sm font-semibold">{pin.title}</p>
-              <p className="text-xs text-stone-600">{pin.region} • {pin.state}</p>
-              <p className="text-xs text-stone-500">{pin.address}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{pin.region} • {pin.state}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{pin.address}</p>
               <p className="text-sm leading-6">{pin.description}</p>
               {pin.isCluster ? (
-                <div className="text-xs text-stone-500">
+                <div className="text-xs" style={{ color: "var(--text-muted)" }}>
                   {pin.sampleTitles.map((title) => (
                     <p key={title}>{title}</p>
                   ))}
                 </div>
               ) : null}
-              <p className="text-xs uppercase tracking-[0.18em] text-stone-500">
+              <p className="text-xs uppercase tracking-[0.18em]" style={{ color: "var(--text-muted)" }}>
                 Submitted by {pin.submittedBy}
               </p>
             </div>
