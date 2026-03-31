@@ -728,8 +728,24 @@ export async function submitLocationSubmission(input: {
     )
   );
 
-  if (title.length < 3 || region.length < 2 || state.length < 2 || address.length < 5 || description.length < 12) {
-    return { ok: false, reason: "invalid-submission" } as const;
+  if (title.length < 3) {
+    return { ok: false, reason: "title-too-short" } as const;
+  }
+
+  if (region.length < 2) {
+    return { ok: false, reason: "region-too-short" } as const;
+  }
+
+  if (state.length < 2) {
+    return { ok: false, reason: "state-too-short" } as const;
+  }
+
+  if (address.length < 5) {
+    return { ok: false, reason: "address-too-short" } as const;
+  }
+
+  if (description.length < 12) {
+    return { ok: false, reason: "description-too-short" } as const;
   }
 
   if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {

@@ -23,6 +23,9 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [selectedApp, setSelectedApp] = useState<AppLicense>("urbex-db");
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
+  const [generatedKeys, setGeneratedKeys] = useState<string[]>([]);
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchCount, setBatchCount] = useState(5);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -82,6 +85,42 @@ export default function AdminPage() {
 
     setGeneratedKey(result.code);
     setPanelMessage("Single-use key generated.");
+    setBusy(false);
+  }
+
+  async function onGenerateBatch() {
+    if (!user) {
+      return;
+    }
+
+    setBusy(true);
+    setPanelMessage(null);
+    setGeneratedKeys([]);
+
+    const keys: string[] = [];
+    let failedCount = 0;
+
+    for (let i = 0; i < batchCount; i++) {
+      const result = await createLicenseKeyForApp(user.uid, selectedApp);
+      if (result.ok) {
+        keys.push(result.code);
+      } else {
+        failedCount++;
+      }
+    }
+
+    if (keys.length === 0) {
+      setPanelMessage(`Could not generate any keys. Tried ${batchCount} times.`);
+      setBusy(false);
+      return;
+    }
+
+    setGeneratedKeys(keys);
+    setPanelMessage(
+      failedCount > 0
+        ? `Generated ${keys.length} of ${batchCount} keys. ${failedCount} failed.`
+        : `Generated ${keys.length} keys successfully.`
+    );
     setBusy(false);
   }
 
@@ -151,21 +190,94 @@ export default function AdminPage() {
               </select>
             </label>
 
+            <div className="mt-5 flex items-center gap-3 rounded-xl border border-[var(--line)] bg-white/80 px-4 py-3">
+              <input
+                type="checkbox"
+                id="batchMode"
+                checked={batchMode}
+                onChange={(event) => {
+                  setBatchMode(event.target.checked);
+                  setGeneratedKey(null);
+                  setGeneratedKeys([]);
+                }}
+                className="rounded border border-[var(--line)]"
+              />
+              <label htmlFor="batchMode" className="text-sm text-[var(--text)]">
+                Batch generation mode
+              </label>
+            </div>
+
+            {batchMode ? (
+              <label className="mt-5 block space-y-2 text-sm text-[var(--text-muted)]">
+                <span>Number of keys to generate</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={batchCount}
+                  onChange={(event) => {
+                    setBatchCount(Math.max(1, Math.min(100, Number(event.target.value))));
+                  }}
+                  className="w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-[var(--text)] outline-none"
+                />
+              </label>
+            ) : null}
+
             <button
               type="button"
               disabled={busy}
               onClick={() => {
-                void onGenerateKey();
+                if (batchMode) {
+                  void onGenerateBatch();
+                } else {
+                  void onGenerateKey();
+                }
               }}
               className="mt-5 w-full rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {busy ? "Working..." : "Generate license key"}
+              {busy ? "Working..." : batchMode ? `Generate ${batchCount} keys` : "Generate license key"}
             </button>
 
             {generatedKey ? (
               <div className="mt-5 rounded-2xl bg-white/80 p-4 text-sm text-[var(--text-muted)]">
                 <p className="font-semibold text-[var(--text)]">{generatedKey}</p>
                 <p className="mt-2">Single-use key for {selectedApp === "urbex-db" ? "Urbex DB" : "moderator role"}.</p>
+              </div>
+            ) : null}
+
+            {generatedKeys.length > 0 ? (
+              <div className="mt-5 rounded-2xl bg-white/80 p-4 text-sm text-[var(--text-muted)]">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <p className="font-semibold text-[var(--text)]">{generatedKeys.length} keys generated</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allKeys = generatedKeys.join("\n");
+                      void navigator.clipboard.writeText(allKeys);
+                      setPanelMessage("All keys copied to clipboard!");
+                    }}
+                    className="text-xs font-semibold text-[var(--accent)] hover:text-[var(--accent-strong)]"
+                  >
+                    Copy all
+                  </button>
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                  {generatedKeys.map((key, index) => (
+                    <div key={index} className="flex items-center justify-between gap-2 p-2 bg-white rounded border border-[var(--line)]">
+                      <code className="text-xs font-mono text-[var(--text)]">{key}</code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(key);
+                          setPanelMessage("Key copied!");
+                        }}
+                        className="text-xs font-semibold text-[var(--accent)] hover:text-[var(--accent-strong)]"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
 

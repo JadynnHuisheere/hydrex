@@ -300,10 +300,17 @@ export default function UrbexDbPage() {
     });
 
     if (!result.ok) {
+      const errorMessages: Record<string, string> = {
+        "invalid-coordinates": "Enter valid latitude and longitude values.",
+        "title-too-short": "Location title must be at least 3 characters.",
+        "region-too-short": "Region must be at least 2 characters.",
+        "state-too-short": "State must be at least 2 characters.",
+        "address-too-short": "Address must be at least 5 characters.",
+        "description-too-short": "Description must be at least 12 characters.",
+        "firebase-not-configured": "Firebase is not configured. Contact support."
+      };
       setSubmissionMessage(
-        result.reason === "invalid-coordinates"
-          ? "Enter valid latitude and longitude values."
-          : "Fill out the location details before submitting."
+        errorMessages[result.reason] ?? "Fill out the location details before submitting."
       );
       setSubmissionPending(false);
       return;
