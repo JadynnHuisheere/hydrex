@@ -31,6 +31,7 @@ type UrbexMapProps = {
   onSelectSubmissionPoint?: (point: { lat: number; lng: number }) => void;
   onOpenStreetView?: (point: { lat: number; lng: number; title: string }) => void;
   onOpenPinForum?: (pin: LocationPin) => void;
+  clearTempPinToken?: number;
   searchPoint?: { lat: number; lng: number; label: string } | null;
 };
 
@@ -182,10 +183,14 @@ function MapSearchFocus({ searchPoint }: { searchPoint: UrbexMapProps["searchPoi
   return null;
 }
 
-function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, searchPoint }: UrbexMapProps) {
+function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, clearTempPinToken, searchPoint }: UrbexMapProps) {
   const [zoom, setZoom] = useState(14);
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
   const [tempPoint, setTempPoint] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    setTempPoint(null);
+  }, [clearTempPinToken]);
 
   useMapEvents({
     load(event) {
@@ -381,6 +386,15 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
               >
                 Fill submission at this pin
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenStreetView?.({ lat: tempPoint.lat, lng: tempPoint.lng, title: "Temporary pin" });
+                }}
+                className="rounded-full border border-[var(--line)] px-4 py-2 text-xs font-semibold"
+              >
+                Open Street View
+              </button>
             </div>
           </Popup>
         </CircleMarker>
@@ -412,7 +426,7 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
   );
 }
 
-export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, searchPoint }: UrbexMapProps) {
+export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, clearTempPinToken, searchPoint }: UrbexMapProps) {
   const center = locations[0]
     ? ([locations[0].lat, locations[0].lng] as [number, number])
     : ([39.8283, -98.5795] as [number, number]);
@@ -430,6 +444,7 @@ export function UrbexMap({ locations, onSelectSubmissionPoint, onOpenStreetView,
           onSelectSubmissionPoint={onSelectSubmissionPoint}
           onOpenStreetView={onOpenStreetView}
           onOpenPinForum={onOpenPinForum}
+          clearTempPinToken={clearTempPinToken}
           searchPoint={searchPoint}
         />
       </MapContainer>

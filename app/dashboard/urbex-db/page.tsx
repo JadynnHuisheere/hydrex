@@ -67,8 +67,12 @@ export default function UrbexDbPage() {
   const [mapSearchMessage, setMapSearchMessage] = useState<string | null>(null);
   const [mapSearchPoint, setMapSearchPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const [selectedState, setSelectedState] = useState("all");
+  const [regionValue, setRegionValue] = useState("");
+  const [stateValue, setStateValue] = useState("");
+  const [addressValue, setAddressValue] = useState("");
   const [latValue, setLatValue] = useState("");
   const [lngValue, setLngValue] = useState("");
+  const [clearTempPinToken, setClearTempPinToken] = useState(0);
   const [selectedPin, setSelectedPin] = useState<SelectedPin | null>(null);
   const [forumPosts, setForumPosts] = useState<ForumPostRecord[]>([]);
   const [forumMessage, setForumMessage] = useState<string | null>(null);
@@ -265,6 +269,10 @@ export default function UrbexDbPage() {
     setSubmissionFiles([]);
     setLatValue("");
     setLngValue("");
+    setRegionValue("");
+    setStateValue("");
+    setAddressValue("");
+    setSelectedState("all");
     setMapSelectionMessage(null);
     setSubmissionMessage(
       canModerate
@@ -282,6 +290,50 @@ export default function UrbexDbPage() {
     setLatValue(nextLat);
     setLngValue(nextLng);
     setMapSelectionMessage(`Temporary pin selected at ${nextLat}, ${nextLng}`);
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(nextLat)}&lon=${encodeURIComponent(nextLng)}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              Accept: "application/json"
+            }
+          }
+        );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as {
+          display_name?: string;
+          address?: Record<string, string | undefined>;
+        };
+
+        const nextAddress = data.display_name?.trim();
+        const nextState = data.address?.state?.trim();
+        const nextRegion =
+          data.address?.city?.trim() ||
+          data.address?.town?.trim() ||
+          data.address?.county?.trim() ||
+          data.address?.suburb?.trim();
+
+        if (nextAddress) {
+          setAddressValue(nextAddress);
+        }
+
+        if (nextState) {
+          setStateValue(nextState);
+        }
+
+        if (nextRegion) {
+          setRegionValue(nextRegion);
+        }
+      } catch {
+        // Ignore reverse geocode failures and keep manual entry available.
+      }
+    })();
 
     const continueToForm = window.confirm("Use this pin for a new submission?");
 
@@ -305,6 +357,7 @@ export default function UrbexDbPage() {
 
     setMapSearchPending(true);
     setMapSearchMessage(null);
+    setClearTempPinToken((current) => current + 1);
 
     try {
       const response = await fetch(
@@ -444,132 +497,18 @@ export default function UrbexDbPage() {
                   </select>
                 </label>
               </div>
-              <div className={`grid gap-4 ${selectedPin ? "xl:grid-cols-[1.5fr_1fr]" : ""}`}>
-                <UrbexMap
-                  locations={filteredLocations}
-                  onSelectSubmissionPoint={onSelectSubmissionPoint}
-                  searchPoint={mapSearchPoint}
-                  onOpenPinForum={(pin) => {
-                    void openPinForum(pin);
-                  }}
-                  onOpenStreetView={(point) => {
-                    setStreetViewTarget(point);
-                  }}
-                />
-
-                {selectedPin ? (
-                  <aside className="panel rounded-[24px] p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="eyebrow">Pin forum</p>
-                        <p className="mt-1 text-base font-semibold">{selectedPin.title}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedPin(null);
-                          setForumPosts([]);
-                          setForumFiles([]);
-                        }}
-                        className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
-                      >
-                        Close
-                      </button>
-                    </div>
-
-                    <p className="mt-3 text-xs text-[var(--text-muted)]">
-                      {selectedPin.region} • {selectedPin.state} • {selectedPin.address}
-                    </p>
-
-                    <form
-                      action={(formData) => {
-                        void onCreateForumPost(formData);
-                      }}
-                      className="mt-4 space-y-3"
-                    >
-                      <textarea
-                        name="forumMessage"
-                        rows={3}
-                        placeholder="Add notes, entry updates, conditions, or media context..."
-                        className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-2 text-sm text-[var(--text)] outline-none"
-                      />
-
-                      <div
-                        onDragOver={(event) => {
-                          event.preventDefault();
-                          setForumDropActive(true);
-                        }}
-                        onDragLeave={() => {
-                          setForumDropActive(false);
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          setForumDropActive(false);
-                          appendForumFiles(event.dataTransfer.files);
-                        }}
-                        className={`rounded-2xl border px-3 py-3 text-xs text-[var(--text-muted)] ${forumDropActive ? "border-[var(--accent)]" : "border-[var(--line)]"}`}
-                      >
-                        Drag images/videos here or upload
-                      </div>
-
-                      <input
-                        ref={forumMediaInputRef}
-                        type="file"
-                        accept="image/*,video/*"
-                        multiple
-                        onChange={(event) => {
-                          if (event.target.files) {
-                            appendForumFiles(event.target.files);
-                          }
-                        }}
-                        className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-2 text-xs"
-                      />
-
-                      {forumFiles.length > 0 ? (
-                        <p className="text-xs text-[var(--text-muted)]">{forumFiles.length} media file(s) attached</p>
-                      ) : null}
-
-                      <button
-                        type="submit"
-                        disabled={forumPending}
-                        className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {forumPending ? "Posting..." : "Post to pin forum"}
-                      </button>
-                    </form>
-
-                    {forumMessage ? (
-                      <p className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">{forumMessage}</p>
-                    ) : null}
-
-                    <div className="mt-4 space-y-3">
-                      {forumPosts.length === 0 ? (
-                        <p className="rounded-xl bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">
-                          No forum posts yet for this pin.
-                        </p>
-                      ) : null}
-                      {forumPosts.map((post) => (
-                        <div key={post.id} className="rounded-xl bg-white/80 p-3">
-                          <p className="text-xs font-semibold">{post.authorName}</p>
-                          <p className="mt-1 text-xs text-[var(--text-muted)]">{post.createdAt}</p>
-                          {post.message ? <p className="mt-2 text-sm">{post.message}</p> : null}
-                          {post.media.length > 0 ? (
-                            <div className="mt-2 grid grid-cols-3 gap-2">
-                              {post.media.slice(0, 6).map((mediaItem) => (
-                                mediaItem.kind === "video" ? (
-                                  <video key={mediaItem.url} src={mediaItem.url} className="h-16 w-full rounded-md object-cover" controls preload="metadata" />
-                                ) : (
-                                  <img key={mediaItem.url} src={mediaItem.url} alt="Forum media" className="h-16 w-full rounded-md object-cover" loading="lazy" />
-                                )
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </aside>
-                ) : null}
-              </div>
+              <UrbexMap
+                locations={filteredLocations}
+                onSelectSubmissionPoint={onSelectSubmissionPoint}
+                searchPoint={mapSearchPoint}
+                clearTempPinToken={clearTempPinToken}
+                onOpenPinForum={(pin) => {
+                  void openPinForum(pin);
+                }}
+                onOpenStreetView={(point) => {
+                  setStreetViewTarget(point);
+                }}
+              />
               {mapSearchMessage ? (
                 <p className="mt-4 rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--text-muted)]">
                   {mapSearchMessage}
@@ -627,6 +566,10 @@ export default function UrbexDbPage() {
                     <input
                       name="region"
                       required
+                      value={regionValue}
+                      onChange={(event) => {
+                        setRegionValue(event.target.value);
+                      }}
                       className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                     />
                   </label>
@@ -638,6 +581,10 @@ export default function UrbexDbPage() {
                     <input
                       name="state"
                       required
+                      value={stateValue}
+                      onChange={(event) => {
+                        setStateValue(event.target.value);
+                      }}
                       className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                     />
                   </label>
@@ -646,6 +593,10 @@ export default function UrbexDbPage() {
                     <input
                       name="address"
                       required
+                      value={addressValue}
+                      onChange={(event) => {
+                        setAddressValue(event.target.value);
+                      }}
                       className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-4 py-3 text-[var(--text)] outline-none"
                     />
                   </label>
@@ -781,6 +732,7 @@ export default function UrbexDbPage() {
             </article>
           </div>
 
+          {!selectedPin ? (
           <div className="space-y-6">
             {canModerate ? (
               <section className="panel rounded-[32px] p-6">
@@ -963,6 +915,7 @@ export default function UrbexDbPage() {
               ) : null}
             </section>
           </div>
+          ) : null}
         </section>
 
         <Link href="/dashboard" className="inline-flex rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold">
@@ -996,6 +949,121 @@ export default function UrbexDbPage() {
               className="h-[70vh] w-full rounded-[16px] border border-[var(--line)]"
               loading="lazy"
             />
+          </div>
+        </div>
+      ) : null}
+
+      {selectedPin ? (
+        <div className="fixed inset-y-0 right-0 z-[9997] w-full max-w-md border-l border-[var(--line)] bg-[var(--background-strong)] p-4 shadow-2xl">
+          <div className="panel-strong flex h-full flex-col rounded-[24px] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="eyebrow">Pin forum</p>
+                <p className="mt-1 text-base font-semibold">{selectedPin.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPin(null);
+                  setForumPosts([]);
+                  setForumFiles([]);
+                }}
+                className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-[var(--text-muted)]">
+              {selectedPin.region} • {selectedPin.state} • {selectedPin.address}
+            </p>
+
+            <form
+              action={(formData) => {
+                void onCreateForumPost(formData);
+              }}
+              className="mt-4 space-y-3"
+            >
+              <textarea
+                name="forumMessage"
+                rows={3}
+                placeholder="Add notes, entry updates, conditions, or media context..."
+                className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-2 text-sm text-[var(--text)] outline-none"
+              />
+
+              <div
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setForumDropActive(true);
+                }}
+                onDragLeave={() => {
+                  setForumDropActive(false);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setForumDropActive(false);
+                  appendForumFiles(event.dataTransfer.files);
+                }}
+                className={`rounded-2xl border px-3 py-3 text-xs text-[var(--text-muted)] ${forumDropActive ? "border-[var(--accent)]" : "border-[var(--line)]"}`}
+              >
+                Drag images/videos here or upload
+              </div>
+
+              <input
+                ref={forumMediaInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={(event) => {
+                  if (event.target.files) {
+                    appendForumFiles(event.target.files);
+                  }
+                }}
+                className="w-full rounded-2xl border border-[var(--line)] bg-white/80 px-3 py-2 text-xs"
+              />
+
+              {forumFiles.length > 0 ? (
+                <p className="text-xs text-[var(--text-muted)]">{forumFiles.length} media file(s) attached</p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={forumPending}
+                className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {forumPending ? "Posting..." : "Post to pin forum"}
+              </button>
+            </form>
+
+            {forumMessage ? (
+              <p className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">{forumMessage}</p>
+            ) : null}
+
+            <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
+              {forumPosts.length === 0 ? (
+                <p className="rounded-xl bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">
+                  No forum posts yet for this pin.
+                </p>
+              ) : null}
+              {forumPosts.map((post) => (
+                <div key={post.id} className="rounded-xl bg-white/80 p-3">
+                  <p className="text-xs font-semibold">{post.authorName}</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">{post.createdAt}</p>
+                  {post.message ? <p className="mt-2 text-sm">{post.message}</p> : null}
+                  {post.media.length > 0 ? (
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {post.media.slice(0, 6).map((mediaItem) => (
+                        mediaItem.kind === "video" ? (
+                          <video key={mediaItem.url} src={mediaItem.url} className="h-16 w-full rounded-md object-cover" controls preload="metadata" />
+                        ) : (
+                          <img key={mediaItem.url} src={mediaItem.url} alt="Forum media" className="h-16 w-full rounded-md object-cover" loading="lazy" />
+                        )
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}
