@@ -53,6 +53,7 @@ export type LocationRecord = {
   lng: number;
   description: string;
   submittedBy: string;
+  submittedByUid?: string;
   createdAt?: Timestamp;
 };
 
@@ -69,6 +70,9 @@ export type SubmissionRecord = {
   region: string;
   state: string;
   address: string;
+  lat: number;
+  lng: number;
+  description: string;
   points: number;
 };
 
@@ -618,6 +622,7 @@ export async function fetchApprovedLocations() {
       lng: Number(data.lng ?? 0),
       description: String(data.description ?? "No description."),
       submittedBy: String(data.submittedBy ?? "Unknown"),
+      submittedByUid: typeof data.submittedByUid === "string" ? data.submittedByUid : undefined,
       createdAt: data.createdAt as Timestamp | undefined
     };
   });
@@ -676,6 +681,9 @@ export async function fetchPendingSubmissions() {
       region: String(data.region ?? "Unknown"),
       state: String(data.state ?? "Unknown"),
       address: String(data.address ?? "Address unavailable"),
+      lat: Number(data.lat ?? 0),
+      lng: Number(data.lng ?? 0),
+      description: String(data.description ?? "Awaiting moderator review."),
       points: Number(data.points ?? 25)
     };
   });

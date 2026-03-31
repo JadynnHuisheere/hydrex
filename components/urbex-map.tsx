@@ -33,6 +33,8 @@ type UrbexMapProps = {
   onOpenPinForum?: (pin: LocationPin) => void;
   clearTempPinToken?: number;
   searchPoint?: { lat: number; lng: number; label: string } | null;
+  mapStyle?: "street" | "satellite" | "topo";
+  showRailwayOverlay?: boolean;
 };
 
 type DisplayPin = {
@@ -373,19 +375,51 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
   );
 }
 
-export function UrbexMap({ locations, height = 440, onSelectSubmissionPoint, onOpenStreetView, onOpenPinForum, clearTempPinToken, searchPoint }: UrbexMapProps) {
+export function UrbexMap({
+  locations,
+  height = 440,
+  onSelectSubmissionPoint,
+  onOpenStreetView,
+  onOpenPinForum,
+  clearTempPinToken,
+  searchPoint,
+  mapStyle = "street",
+  showRailwayOverlay = false
+}: UrbexMapProps) {
   const center = locations[0]
     ? ([locations[0].lat, locations[0].lng] as [number, number])
     : ([39.8283, -98.5795] as [number, number]);
+
+  const tileConfig =
+    mapStyle === "satellite"
+      ? {
+          url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          attribution:
+            'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+        }
+      : mapStyle === "topo"
+        ? {
+            url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+            attribution:
+              'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+          }
+        : {
+            url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          };
 
   return (
     <div className="map-frame overflow-hidden rounded-[24px] border border-[var(--line)]" style={{ height }}>
       <MapContainer center={center} zoom={5} scrollWheelZoom className="h-full w-full">
         <MapSearchFocus searchPoint={searchPoint} />
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <TileLayer attribution={tileConfig.attribution} url={tileConfig.url} />
+        {showRailwayOverlay ? (
+          <TileLayer
+            attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Style: &copy; <a href="https://www.openrailwaymap.org/">OpenRailwayMap</a>'
+            url="https://{s}.tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png"
+            opacity={0.7}
+          />
+        ) : null}
         <MapViewportMarkers
           locations={locations}
           onSelectSubmissionPoint={onSelectSubmissionPoint}

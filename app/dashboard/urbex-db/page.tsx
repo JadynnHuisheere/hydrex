@@ -68,6 +68,14 @@ export default function UrbexDbPage() {
   const [mapSearchMessage, setMapSearchMessage] = useState<string | null>(null);
   const [mapSearchPoint, setMapSearchPoint] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const [selectedState, setSelectedState] = useState("all");
+  const [mapStyle, setMapStyle] = useState<"street" | "satellite" | "topo">("street");
+  const [showRailwayOverlay, setShowRailwayOverlay] = useState(false);
+  const [showPrivateOnly, setShowPrivateOnly] = useState(false);
+  const [showEarlyAccess, setShowEarlyAccess] = useState(false);
+  const [showWeatherGoldenHour, setShowWeatherGoldenHour] = useState(false);
+  const [showContourLines, setShowContourLines] = useState(true);
+  const [showWaterway, setShowWaterway] = useState(true);
+  const [weatherGoldenHourNote, setWeatherGoldenHourNote] = useState<string | null>(null);
   const [showHeroHeader, setShowHeroHeader] = useState(true);
   const [mapHeight, setMapHeight] = useState(440);
   const [regionValue, setRegionValue] = useState("");
@@ -473,16 +481,113 @@ export default function UrbexDbPage() {
   }
 
   const leaderboardTop = useMemo(() => leaderboard.slice(0, 50), [leaderboard]);
+  const earlyAccessLocations = useMemo(() => {
+    if (!showEarlyAccess) {
+      return [] as LocationRecord[];
+    }
+
+    return pendingSubmissions
+      .filter((submission) => Number.isFinite(submission.lat) && Number.isFinite(submission.lng))
+      .map((submission) => ({
+        id: `early-${submission.id}`,
+        title: `[Early] ${submission.title}`,
+        region: submission.region,
+        state: submission.state,
+        address: submission.address,
+        status: "pending" as const,
+        points: submission.points,
+        images: submission.images,
+        imageUrls: submission.imageUrls,
+        media: submission.media,
+        lat: submission.lat,
+        lng: submission.lng,
+        description: submission.description,
+        submittedBy: submission.submittedBy,
+        submittedByUid: submission.submittedByUid
+      }));
+  }, [pendingSubmissions, showEarlyAccess]);
   const availableStates = useMemo(
-    () => Array.from(new Set(approvedLocations.map((location) => location.state))).sort(),
-    [approvedLocations]
+    () => Array.from(new Set([...approvedLocations, ...earlyAccessLocations].map((location) => location.state))).sort(),
+    [approvedLocations, earlyAccessLocations]
   );
+  const currentUid = user?.uid ?? "";
+
   const filteredLocations = useMemo(() => {
-    return approvedLocations.filter((location) => {
+    const publicMatches = approvedLocations.filter((location) => {
       const matchesState = selectedState === "all" || location.state === selectedState;
-      return matchesState;
+      const matchesPrivate = !showPrivateOnly || (currentUid.length > 0 && location.submittedByUid === currentUid);
+      return matchesState && matchesPrivate;
     });
-  }, [approvedLocations, selectedState]);
+
+    const earlyAccessMatches = earlyAccessLocations.filter((location) => {
+      const matchesState = selectedState === "all" || location.state === selectedState;
+      const matchesPrivate = !showPrivateOnly || (currentUid.length > 0 && location.submittedByUid === currentUid);
+      return matchesState && matchesPrivate;
+    });
+
+    return [...earlyAccessMatches, ...publicMatches];
+  }, [approvedLocations, currentUid, earlyAccessLocations, selectedState, showPrivateOnly]);
+
+  const goldenHourTarget = useMemo(() => {
+    if (mapSearchPoint) {
+      return { lat: mapSearchPoint.lat, lng: mapSearchPoint.lng, label: mapSearchPoint.label };
+    }
+
+    const first = filteredLocations[0];
+    if (!first) {
+      return null;
+    }
+
+    return { lat: first.lat, lng: first.lng, label: first.title };
+  }, [filteredLocations, mapSearchPoint]);
+
+  useEffect(() => {
+    if (!showWeatherGoldenHour || !goldenHourTarget) {
+      setWeatherGoldenHourNote(null);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const weatherResponse = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(String(goldenHourTarget.lat))}&longitude=${encodeURIComponent(String(goldenHourTarget.lng))}&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto`
+        );
+        const sunResponse = await fetch(
+          `https://api.sunrise-sunset.org/json?lat=${encodeURIComponent(String(goldenHourTarget.lat))}&lng=${encodeURIComponent(String(goldenHourTarget.lng))}&formatted=0`
+        );
+
+        if (!weatherResponse.ok || !sunResponse.ok) {
+          setWeatherGoldenHourNote("Could not load weather/golden-hour details right now.");
+          return;
+        }
+
+        const weatherData = (await weatherResponse.json()) as {
+          current?: { temperature_2m?: number; wind_speed_10m?: number };
+        };
+        const sunData = (await sunResponse.json()) as {
+          results?: { sunrise?: string; sunset?: string };
+        };
+
+        const temperature = weatherData.current?.temperature_2m;
+        const wind = weatherData.current?.wind_speed_10m;
+        const sunrise = sunData.results?.sunrise ? new Date(sunData.results.sunrise) : null;
+        const sunset = sunData.results?.sunset ? new Date(sunData.results.sunset) : null;
+        const morningGoldenHour = sunrise ? new Date(sunrise.getTime() + 60 * 60 * 1000) : null;
+        const eveningGoldenHour = sunset ? new Date(sunset.getTime() - 60 * 60 * 1000) : null;
+
+        const tempLabel = Number.isFinite(temperature) ? `${temperature}°C` : "--";
+        const windLabel = Number.isFinite(wind) ? `${wind} km/h` : "--";
+        const morningLabel = morningGoldenHour ? morningGoldenHour.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--";
+        const eveningLabel = eveningGoldenHour ? eveningGoldenHour.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--";
+
+        setWeatherGoldenHourNote(
+          `${goldenHourTarget.label}: ${tempLabel}, wind ${windLabel}. Golden hour ~ ${morningLabel} and ${eveningLabel}.`
+        );
+      } catch {
+        setWeatherGoldenHourNote("Could not load weather/golden-hour details right now.");
+      }
+    })();
+  }, [goldenHourTarget, showWeatherGoldenHour]);
 
   if (loading || !user || !hasUrbexAccess) {
     return (
@@ -627,12 +732,122 @@ export default function UrbexDbPage() {
                   </select>
                 </label>
               </div>
+              <div className="mb-5 rounded-2xl border border-[var(--line)] bg-white/75 p-4">
+                <p className="text-sm font-semibold">Map options</p>
+                <div className="mt-3 grid gap-2 text-xs text-[var(--text-muted)] sm:grid-cols-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={showEarlyAccess}
+                      onChange={(event) => {
+                        setShowEarlyAccess(event.target.checked);
+                      }}
+                    />
+                    Early Access (show pending pins)
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={showWeatherGoldenHour}
+                      onChange={(event) => {
+                        setShowWeatherGoldenHour(event.target.checked);
+                      }}
+                    />
+                    Weather & Golden Hour
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={showPrivateOnly}
+                      onChange={(event) => {
+                        setShowPrivateOnly(event.target.checked);
+                      }}
+                    />
+                    Private Locations (my submissions)
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={showRailwayOverlay}
+                      onChange={(event) => {
+                        setShowRailwayOverlay(event.target.checked);
+                      }}
+                    />
+                    Railway Overlay
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="mapStyle"
+                      checked={mapStyle === "topo"}
+                      onChange={() => {
+                        setMapStyle("topo");
+                      }}
+                    />
+                    Topo Map
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="mapStyle"
+                      checked={mapStyle === "satellite"}
+                      onChange={() => {
+                        setMapStyle("satellite");
+                      }}
+                    />
+                    Satellite View
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="mapStyle"
+                      checked={mapStyle === "street"}
+                      onChange={() => {
+                        setMapStyle("street");
+                      }}
+                    />
+                    Street Map
+                  </label>
+                </div>
+                {mapStyle === "topo" ? (
+                  <div className="mt-3 grid gap-2 text-xs text-[var(--text-muted)] sm:grid-cols-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={showContourLines}
+                        onChange={(event) => {
+                          setShowContourLines(event.target.checked);
+                        }}
+                      />
+                      Contour lines
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={showWaterway}
+                        onChange={(event) => {
+                          setShowWaterway(event.target.checked);
+                        }}
+                      />
+                      Waterway
+                    </label>
+                    <span>Location</span>
+                  </div>
+                ) : null}
+                {showWeatherGoldenHour && weatherGoldenHourNote ? (
+                  <p className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-xs text-[var(--text-muted)]">
+                    {weatherGoldenHourNote}
+                  </p>
+                ) : null}
+              </div>
               <UrbexMap
                 locations={filteredLocations}
                 height={mapHeight}
                 onSelectSubmissionPoint={onSelectSubmissionPoint}
                 searchPoint={mapSearchPoint}
                 clearTempPinToken={clearTempPinToken}
+                mapStyle={mapStyle}
+                showRailwayOverlay={showRailwayOverlay}
                 onOpenPinForum={(pin) => {
                   void openPinForum(pin);
                 }}
