@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -142,14 +142,18 @@ export default function UrbexDbPage() {
     setForumFiles((current) => [...current, ...accepted].slice(0, 8));
   }
 
-  async function openPinForum(pin: SelectedPin) {
+  const openPinForum = useCallback(async (pin: SelectedPin) => {
     setSelectedPin(pin);
     setForumPending(true);
     setForumMessage(null);
     const posts = await fetchLocationForumPosts(pin.id);
     setForumPosts(posts);
     setForumPending(false);
-  }
+  }, []);
+
+  const onMapOpenStreetView = useCallback((point: { lat: number; lng: number; title: string }) => {
+    setStreetViewTarget(point);
+  }, []);
 
   function onDropPanel(target: PanelId) {
     if (!draggingPanel || draggingPanel === target) {
@@ -239,7 +243,7 @@ export default function UrbexDbPage() {
     return () => {
       window.clearInterval(timer);
     };
-  }, [hasUrbexAccess, selectedPin, user]);
+  }, [hasUrbexAccess, openPinForum, selectedPin, user]);
 
   async function onReview(submissionId: string, decision: "approved" | "rejected") {
     if (!user) {
@@ -852,12 +856,8 @@ export default function UrbexDbPage() {
                 clearTempPinToken={clearTempPinToken}
                 mapStyle={mapStyle}
                 showRailwayOverlay={showRailwayOverlay}
-                onOpenPinForum={(pin) => {
-                  void openPinForum(pin);
-                }}
-                onOpenStreetView={(point) => {
-                  setStreetViewTarget(point);
-                }}
+                onOpenPinForum={openPinForum}
+                onOpenStreetView={onMapOpenStreetView}
               />
               {mapSearchMessage ? (
                 <p className="mt-4 rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--text-muted)]">

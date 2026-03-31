@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
   CircleMarker,
   MapContainer,
@@ -439,7 +439,7 @@ function MapViewportMarkers({ locations, onSelectSubmissionPoint, onOpenStreetVi
   );
 }
 
-export function UrbexMap({
+export const UrbexMap = memo(function UrbexMap({
   locations,
   height = 440,
   onSelectSubmissionPoint,
@@ -495,4 +495,6 @@ export function UrbexMap({
       </MapContainer>
     </div>
   );
-}
+});
+
+UrbexMap.displayName = "UrbexMap";
